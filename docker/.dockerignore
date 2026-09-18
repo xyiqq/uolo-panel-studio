@@ -1,0 +1,9 @@
+# 多阶段构建忽略本机依赖与巨大基线文件
+node_modules
+dist
+.git
+配电工坊V4.html
+*.md
+docs
+.tmp
+.temp

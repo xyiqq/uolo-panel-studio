@@ -1,0 +1,22 @@
+# 依赖与构建
+
+node_modules/
+dist/
+.vite/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+
+# 本地单文件导出（可用 npm run build 再生）
+配电工坊V4.html
+*V4.html
+
+# 本地环境
+.env
+.env.*
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
