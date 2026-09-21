@@ -65,7 +65,9 @@ export function terminalWireSegments(design, assembly, resolve) {
     if (ch < 1 || ch > output.product.channels || r.color === 'blue') continue;
     const source = {x:output.x-output.product.width/2+ch*output.product.width/(output.product.channels+1),y:output.y-output.product.height/2,z:output.product.depth+5};
     const target = {x,y:y-term.product.height/2,z:term.product.depth+5};
-    segments.push({id:`${r.terminalId}:${r.pole}`, ...r, source, target,
+    const circuit=design.circuits?.find(c=>c.id===output.module?.channels?.[ch]);
+    const fieldName=output.module?.channelLabels?.[ch] || circuit?.name || r.loadName || `${output.module?.displayName||output.label||output.id} CH${ch}`;
+    segments.push({id:`${r.terminalId}:${r.pole}`, ...r, fieldName, source, target,
       field:{x,y:y+term.product.height/2,z:term.product.depth+5}});
   }
   return segments;

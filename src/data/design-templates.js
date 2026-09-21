@@ -58,6 +58,8 @@ export function createBlankDesign(overrides = {}) {
     protectGroups: [],
     uiMode: "simple",
     nBarPosition: "bottom",
+    includeNeutralBar: true,
+    includeEarthBar: true,
     ...overrides,
   };
 }
@@ -202,6 +204,8 @@ export function snapshotDesignTemplate(design, name) {
     positions: clone(design.positions || {}),
     uiMode: design.uiMode || 'simple',
     nBarPosition: design.nBarPosition || 'bottom',
+    includeNeutralBar: design.includeNeutralBar!==false,
+    includeEarthBar: design.includeEarthBar!==false,
     connections: {},
     states: {},
     wireOverrides: {},

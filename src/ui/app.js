@@ -185,6 +185,23 @@ function moduleAddressFields(m){
 }
 function ra(){
   gX();
+  if(!R('#cabinet-nbar')){
+    const field=document.createElement('label');field.className='field';
+    field.innerHTML='<span>零线排位置</span><select id="cabinet-nbar"><option value="top">上方（横装）</option><option value="bottom">下方（横装）</option><option value="left">左侧（竖装）</option><option value="right">右侧（竖装）</option></select>';
+    R('#cabinet').closest('label').after(field);
+    R('#cabinet-nbar').onchange=e=>de(d=>{d.nBarPosition=e.target.value},true);
+  }
+  R('#cabinet-nbar').value=Y.nBarPosition||'bottom';
+  if(!R('#include-neutral-bar')){
+    const switches=document.createElement('div');switches.style.cssText='display:grid;gap:8px;margin:10px 0';
+    switches.innerHTML='<label class="switch-label"><input type="checkbox" class="switch" id="include-neutral-bar">安装零线排</label><label class="switch-label"><input type="checkbox" class="switch" id="include-earth-bar">安装地线排</label>';
+    R('#cabinet-nbar').closest('label').before(switches);
+    R('#include-neutral-bar').onchange=e=>de(d=>{d.includeNeutralBar=e.target.checked},true);
+    R('#include-earth-bar').onchange=e=>de(d=>{d.includeEarthBar=e.target.checked},true);
+  }
+  R('#include-neutral-bar').checked=Y.includeNeutralBar!==false;
+  R('#include-earth-bar').checked=Y.includeEarthBar!==false;
+  R('#cabinet-nbar').disabled=Y.includeNeutralBar===false;
   if(!R('#terminal-wires-toggle')){
     const toggle=document.createElement('button');
     toggle.id='terminal-wires-toggle';toggle.className='ib';
@@ -278,7 +295,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
       ${Bt("共用空开 / 漏保",`<select id="insp-mod-protect">${re(breakerOptions(),t.module?.protectId||"")}</select>`)}
       <button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
       <button class="btn" id="project-settings" style="width:100%;margin-top:12px">${Ut("settings-2")}\u7535\u6E90\u4E0E\u8BBE\u8BA1\u6761\u4EF6</button></section>
-      <section class="side-section"><h3>N / PE 布局</h3><p class="condition">零线排在箱体${Y.nBarPosition==="top"?"最上":"最下"}横装（可在方案设置切换）；PE 排仍在右侧并与金属箱体、门跨接。灯线先上菲尼克斯端子，再跳到继电器。</p></section>`,R("#project-settings").onclick=yX,R("#device-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")},R("#remove-device")?.addEventListener("click",()=>cX(t.id)),R("#edit-module")?.addEventListener("click",()=>{const m=Y.modules?.find(x=>x.id===t.id),p=Me(Y,m?.productId);m&&p&&openModuleDialog(p,m)}),R("#insp-mod-protect")?.addEventListener("change",ev=>{de(d=>setModuleProtect(d,t.id,ev.target.value||null),true);pe(ev.target.value?"已挂到共用保护 "+ev.target.value:"已取消共用保护")}),document.querySelectorAll("[data-insp-ch-label]").forEach(el=>el.addEventListener("change",()=>{const mid=el.dataset.inspChLabel,ch=+el.dataset.ch;de(d=>{const m=d.modules.find(x=>x.id===mid);if(!m)return;m.channelLabels=m.channelLabels||{};m.channelLabels[ch]=el.value.trim()},true)})),R("#node-on")?.addEventListener("change",u=>de(p=>p.states[t.id]=u.target.checked)),Ye()}let e=kA(Y,a),r=e.product,s=ka(Y,a),n=Je.filter(f=>f.circuit===a.id),o=js(Y).filter(f=>Mo(f,a.voltage)),i=Me(Y,a.rcdProductId),l=r.kind==="rcbo"?r:i;const deviceChain=(Array.isArray(a.devices)&&a.devices.length?a.devices:[{role:"protection",productId:a.productId},...(a.rcdProductId?[{role:"rcd",productId:a.rcdProductId}]:[])]).map(d=>{if(d.role==="protection")return `保护 · ${d.productId?it(gA(Me(Y,d.productId)||{id:d.productId})):"自动选型"}`;if(d.role==="rcd")return `漏保 · ${it(gA(Me(Y,d.productId)||{id:d.productId}))}`;if(d.role==="control"||d.role==="meter")return `${d.role==="meter"?"电表":"控制"} · ${it(d.moduleId)} CH${d.channel}`;return d.role}).join("<br>");R("#inspector").innerHTML=`
+      <section class="side-section"><h3>N / PE 布局</h3><p class="condition">${Y.includeNeutralBar===false?"未安装零线排":"零线排："+(({top:"上方横装",bottom:"下方横装",left:"左侧竖装",right:"右侧竖装"})[Y.nBarPosition]||"下方横装")}；${Y.includeEarthBar===false?"未安装地线排":"PE 排在右侧，并与金属箱体、门跨接"}。灯线先上菲尼克斯端子，再跳到继电器。</p></section>`,R("#project-settings").onclick=yX,R("#device-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")},R("#remove-device")?.addEventListener("click",()=>cX(t.id)),R("#edit-module")?.addEventListener("click",()=>{const m=Y.modules?.find(x=>x.id===t.id),p=Me(Y,m?.productId);m&&p&&openModuleDialog(p,m)}),R("#insp-mod-protect")?.addEventListener("change",ev=>{de(d=>setModuleProtect(d,t.id,ev.target.value||null),true);pe(ev.target.value?"已挂到共用保护 "+ev.target.value:"已取消共用保护")}),document.querySelectorAll("[data-insp-ch-label]").forEach(el=>el.addEventListener("change",()=>{const mid=el.dataset.inspChLabel,ch=+el.dataset.ch;de(d=>{const m=d.modules.find(x=>x.id===mid);if(!m)return;m.channelLabels=m.channelLabels||{};m.channelLabels[ch]=el.value.trim()},true)})),R("#node-on")?.addEventListener("change",u=>de(p=>p.states[t.id]=u.target.checked)),Ye()}let e=kA(Y,a),r=e.product,s=ka(Y,a),n=Je.filter(f=>f.circuit===a.id),o=js(Y).filter(f=>Mo(f,a.voltage)),i=Me(Y,a.rcdProductId),l=r.kind==="rcbo"?r:i;const deviceChain=(Array.isArray(a.devices)&&a.devices.length?a.devices:[{role:"protection",productId:a.productId},...(a.rcdProductId?[{role:"rcd",productId:a.rcdProductId}]:[])]).map(d=>{if(d.role==="protection")return `保护 · ${d.productId?it(gA(Me(Y,d.productId)||{id:d.productId})):"自动选型"}`;if(d.role==="rcd")return `漏保 · ${it(gA(Me(Y,d.productId)||{id:d.productId}))}`;if(d.role==="control"||d.role==="meter")return `${d.role==="meter"?"电表":"控制"} · ${it(d.moduleId)} CH${d.channel}`;return d.role}).join("<br>");R("#inspector").innerHTML=`
   ${t?.role==="branchRcd"?`<section class="side-section selected-part-spec"><div class="section-head"><h2>\u5F53\u524D\u68C0\u89C6\u90E8\u4EF6</h2><span class="tag">${t.id}</span></div>
     <div class="inspector-top">${an(t.product)}<div><strong id="current-part-name">${it(t.product.name)}</strong><small>${it(gA(t.product))}</small></div></div>
     <div class="spec-row"><span>\u5B9E\u9645\u5916\u5F62</span><strong>${t.product.width} \xD7 ${t.product.height} \xD7 ${t.product.depth} mm</strong></div>
@@ -384,7 +401,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     <div class="subnav"><button data-audit="issues" class="${zr==="issues"?"active":""}">\u95EE\u9898\u6E05\u5355 ${Je.length}</button><button data-audit="framework" class="${zr==="framework"?"active":""}">\u6846\u67B6\u6620\u5C04 21</button><button data-audit="sources" class="${zr==="sources"?"active":""}">\u7D20\u6750\u4E0E\u4F9D\u636E</button></div>${a}`,document.querySelectorAll("[data-audit]").forEach(t=>t.onclick=()=>{zr=t.dataset.audit,MX(),Ye()}),document.querySelectorAll("[data-asset]").forEach(t=>t.onclick=()=>MA("\u6765\u6E90\u8BC1\u636E",`<img class="modal-image" src="${To[t.dataset.asset]}" alt="\u6765\u6E90\u9875"><p class="tiny">\u539F\u59CB\u8D44\u6599\u53CA\u63D0\u53D6\u8BB0\u5F55\u5747\u4FDD\u5B58\u5728 V2 \u5DE5\u7A0B\u76EE\u5F55\u4E2D\u3002</p>`)),document.querySelectorAll("[data-select]").forEach(t=>t.onclick=()=>{VA(t.dataset.select),innerWidth<=1e3&&R(".right").classList.add("open")}),R("#audit-json").onclick=()=>nn("\u6761\u4EF6\u6821\u6838\u62A5\u544A.json",JSON.stringify({name:Y.name,generated:new Date().toISOString(),scope:"\u975E\u65BD\u5DE5\u5408\u683C\u7ED3\u8BBA",issues:Je},null,2))}function jU(a){if(a==="\u603B\u5F00")return"4P / 2P \u8FDB\u7EBF\u603B\u5F00\uFF0C\u540C\u65F6\u65AD\u5F00\u76F8\u7EBF\u548C N\uFF1B\u4FDD\u7559\u5FC5\u8981 SPD \u53CA\u5176\u540E\u5907\u4FDD\u62A4\uFF0C\u4E0D\u53E6\u8BBE\u63A7\u5236\u652F\u8DEF\u3002";if(a==="\u667A\u63A7\u7CFB\u7EDF")return"\u5F31\u7535\u3001\u7F51\u7EDC\u4E0E\u5B89\u9632\u72EC\u7ACB\u56DE\u8DEF\uFF1B\u5206\u533A\u4EC5\u4E3A\u903B\u8F91\u5206\u7EC4\uFF0C\u4E0D\u91CD\u590D\u8BBE\u7F6E\u5206\u533A\u603B\u5F00\u3002";let t=Y.circuits.filter(e=>e.path.includes(a));return t.length?t.map(e=>e.id+" "+e.name).join("\uFF1B"):"\u6309\u7236\u5206\u533A\u53CA\u72EC\u7ACB\u8BBE\u5907\u56DE\u8DEF\u5C55\u5F00\uFF1B\u672A\u628A\u680F\u76EE\u76F4\u63A5\u7B49\u540C\u4E8E\u4E00\u4E2A\u65AD\u8DEF\u5668\u3002"}function yX(){MA("方案设置",`
     ${Bt("方案名称",`<input id="settings-name" value="${it(Y.name)}" maxlength="80">`)}
     ${Bt("界面模式",`<select id="settings-ui-mode">${re([["simple","简易布置（推荐）· 通道备注 / 共用保护"],["full","完整工坊 · 强电计算与校核"]],getUiMode(Y))}</select>`)}
-    ${Bt("零线排位置",`<select id="settings-nbar">${re([["bottom","箱体最下（横装）"],["top","箱体最上（横装）"]],Y.nBarPosition==="top"?"top":"bottom")}</select>`)}
+    ${Bt("零线排位置",`<select id="settings-nbar">${re([["bottom","箱体最下（横装）"],["top","箱体最上（横装）"],["left","箱体左侧（竖装）"],["right","箱体右侧（竖装）"]],Y.nBarPosition||'bottom')}</select>`)}
     <div class="field-grid">${Bt("总开额定电流",`<select id="settings-main">${re([...new Set([16,20,25,32,40,63,80,Y.mainAmps])].sort((a,t)=>a-t).map(a=>[a,a+" A"]),Y.mainAmps)}</select>`)}
       <span class="full-only" style="display:contents">${Bt("总进线需用系数",TA("settings-demand",Y.demand,"",.05,1,.01))}</span></div>
     <div class="full-only">
@@ -400,7 +417,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
       const mode=R("#settings-ui-mode").value;
       const name=R("#settings-name").value.trim()||Y.name;
       const mainAmps=+R("#settings-main").value;
-      const nBar=R("#settings-nbar")?.value==="top"?"top":"bottom";
+      const nBar=R("#settings-nbar")?.value||'bottom';
       if(isSimpleMode(Y)||mode==="simple"){
         R("#modal").close();
         de(r=>{r.name=name; r.nBarPosition=nBar; if(mainAmps!==r.mainAmps){r.mainAmps=mainAmps;r.mainProductId=null} setUiMode(r,mode)},true);

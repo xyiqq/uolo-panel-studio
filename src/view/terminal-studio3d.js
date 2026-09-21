@@ -5,7 +5,7 @@ import {terminalWireSegments} from '../core/terminal-connections.js';
 
 export class TerminalStudio3D extends Studio3D {
   signature(net) {
-    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || '']));
+    return super.signature(net) + JSON.stringify([net.nodes.filter(n=>n.id==='N').map(n=>[n.x,n.y,n.barOrient]),net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || ''])]);
   }
   build(net, design, runtime, options) {
     super.build(net, design, runtime, options);
@@ -41,16 +41,26 @@ export class TerminalStudio3D extends Studio3D {
       const lane = Math.min(a.y,b.y)-18-(i%12)*5;
       const z = 3+Math.min(sourceOffset,targetOffset);
       addWire([a,new THREE.Vector3(a.x,a.y-10,a.z),new THREE.Vector3(a.x,a.y-10,z),new THREE.Vector3(a.x,lane,z),new THREE.Vector3(b.x,lane,z),new THREE.Vector3(b.x,b.y-10,z),new THREE.Vector3(b.x,b.y-10,b.z),b]);
-      if(s.loadName){
+      {
         const f = new THREE.Vector3(s.field.x,s.field.y,s.field.z+targetOffset);
-        addWire([f,new THREE.Vector3(f.x,f.y+45,f.z)]);
+        const labelY=f.y+32+Math.floor(i/4)*14;
+        addWire([f,new THREE.Vector3(f.x,labelY,f.z)]);
+        const canvas=document.createElement('canvas');canvas.width=512;canvas.height=64;
+        const ctx=canvas.getContext('2d');ctx.fillStyle='#8d2424';ctx.fillRect(0,0,512,64);
+        ctx.fillStyle='#ffffff';ctx.font='28px "Microsoft YaHei", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.fieldName,256,32,490);
+        const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+        const label=new THREE.Mesh(new THREE.PlaneGeometry(76,9),new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide}));
+        // Stagger labels in separate lanes so adjacent 5.2mm terminals stay legible.
+        const lx=(i%4-1.5)*(net.assembly.box.width-80)/4;
+        addWire([new THREE.Vector3(f.x,labelY,f.z),new THREE.Vector3(lx-38,labelY,f.z)]);
+        label.position.set(lx,labelY,f.z);label.userData.fieldLabel=true;group.add(label);
       }
     });
     this.dirty = true;
   }
   clearTerminalWires(){
     if(!this.terminalWires) return;
-    this.terminalWires.traverse(o=>o.geometry?.dispose());
+    this.terminalWires.traverse(o=>{o.geometry?.dispose();if(o.userData.fieldLabel){o.material.map?.dispose();o.material.dispose()}});
     this.scene.remove(this.terminalWires);
     this.terminalMaterial?.dispose();
     this.terminalWires=null;

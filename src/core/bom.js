@@ -95,14 +95,14 @@ export function buildBom(design, assembly, net) {
     sku: "N-BAR",
     name: "N 端子排",
     brand: "",
-    qty: 1,
+    qty: design.includeNeutralBar===false?0:1,
     note: "",
   });
   addItem(itemMap, {
     sku: "PE-BAR",
     name: "PE 端子排",
     brand: "",
-    qty: 1,
+    qty: design.includeEarthBar===false?0:1,
     note: "",
   });
 
@@ -195,7 +195,7 @@ export function buildBom(design, assembly, net) {
     }
   }
 
-  const items = [...itemMap.values()];
+  const items = [...itemMap.values()].filter(item=>item.qty>0);
   const wires = [...wireMap.values()].map((w) => ({
     ...w,
     meters: Math.round(w.meters * 1000) / 1000,
