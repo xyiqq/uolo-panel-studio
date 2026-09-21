@@ -5,10 +5,19 @@ import {terminalWireSegments} from '../core/terminal-connections.js';
 
 export class TerminalStudio3D extends Studio3D {
   signature(net) {
-    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '']));
+    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '']));
   }
   build(net, design, runtime, options) {
     super.build(net, design, runtime, options);
+    this.drawTerminalWires();
+  }
+  applyPose(amount=this.explosion) {
+    super.applyPose(amount);
+    if(this.terminalWires) this.drawTerminalWires();
+  }
+  drawTerminalWires() {
+    const {net,design,options}=this;
+    if(!net || !design || !this.model) return;
     this.clearTerminalWires();
     const group = new THREE.Group();
     this.terminalWires = group;
@@ -23,14 +32,17 @@ export class TerminalStudio3D extends Studio3D {
       group.add(mesh);
     };
     segments.forEach((s,i)=>{
-      if(this.terminalWiresVisible===false || options.isolate || options.exploded) return;
+      if(this.terminalWiresVisible===false || options.isolate) return;
       const a = new THREE.Vector3(s.source.x,s.source.y,s.source.z);
       const b = new THREE.Vector3(s.target.x,s.target.y,s.target.z);
+      const sourceOffset=this.model.refs.get(s.output.split(':')[0])?.group.position.z || 0;
+      const targetOffset=this.model.refs.get(s.terminalId)?.group.position.z || 0;
+      a.z+=sourceOffset;b.z+=targetOffset;
       const lane = Math.min(a.y,b.y)-18-(i%12)*5;
-      const z = 3;
+      const z = 3+Math.min(sourceOffset,targetOffset);
       addWire([a,new THREE.Vector3(a.x,a.y-10,a.z),new THREE.Vector3(a.x,a.y-10,z),new THREE.Vector3(a.x,lane,z),new THREE.Vector3(b.x,lane,z),new THREE.Vector3(b.x,b.y-10,z),new THREE.Vector3(b.x,b.y-10,b.z),b]);
       if(s.loadName){
-        const f = new THREE.Vector3(s.field.x,s.field.y,s.field.z);
+        const f = new THREE.Vector3(s.field.x,s.field.y,s.field.z+targetOffset);
         addWire([f,new THREE.Vector3(f.x,f.y+45,f.z)]);
       }
     });

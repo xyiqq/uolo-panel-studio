@@ -99,7 +99,7 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
   }
   line(pad,266,w-pad,266);
   const footer = protocols.join(' · ') || (p.modules ? `${p.modules}M · DIN` : 'DIN');
-  text(footer,pad,284,narrow?9:16,muted);
+  text(p.ipAddress ? `IP ${p.ipAddress}` : footer,pad,284,p.ipAddress?18:narrow?9:16,muted);
   return { width:W,height:H,w,h,shapes,kind,title:`${p.brand||''} ${p.name||model} · 参数化外观示意，非厂家接线图；指示灯不代表实时状态` };
 }
 

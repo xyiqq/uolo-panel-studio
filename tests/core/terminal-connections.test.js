@@ -3,7 +3,7 @@ import {createBlankDesign, snapshotDesignTemplate, materializeTemplate} from '..
 import {migrateV2ToV3} from '../../src/core/schema/migrate.js';
 import {buildHandoverFiles} from '../../src/core/handover.js';
 import {findProduct,validateDesign,buildAssembly} from '../../src/core/domain.js';
-import {normalizeModule,validateHardwareId} from '../../src/core/modules.js';
+import {normalizeModule,validateHardwareId,validateIpAddress,isNetworkModule} from '../../src/core/modules.js';
 import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '../../src/core/terminal-connections.js';
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
 import {buildPortTemplates} from '../../src/core/ports.js';
@@ -14,6 +14,19 @@ function fixture(){
  d.modules=[['T1','phoenix-pt25-gy-4'],['K1','tuya-relay-4ch']].map(([id,productId])=>normalizeModule({id,productId},findProduct(d,productId)));
  return d;
 }
+it('gateway IP supports valid IPv4/IPv6, clearing and persisted SVG',()=>{
+ expect(validateIpAddress('192.168.1.100')).toBe('192.168.1.100');
+ expect(validateIpAddress('2001:db8::1')).toBe('2001:db8::1');
+ expect(validateIpAddress('')).toBe('');
+ for(const ip of ['999.1.1.1','abc','1.2.3','192.168.1.1:80']) expect(()=>validateIpAddress(ip)).toThrow();
+ expect(isNetworkModule({kind:'gateway',protocol:['dali']})).toBe(true);
+ expect(isNetworkModule({kind:'gateway',protocol:['rs485']})).toBe(true);
+ const d=fixture(),p=findProduct(d,'crestron-din-dali-2');
+ d.modules=[normalizeModule({id:'GW1',productId:p.id,ipAddress:'192.168.1.100'},p)];
+ const loaded=materializeTemplate(snapshotDesignTemplate(d,'网关模板'));
+ expect(loaded.modules[0].ipAddress).toBe('192.168.1.100');
+ expect(renderSmartModuleFaces({assembly:buildAssembly(loaded)})).toContain('192.168.1.100');
+});
 it('hex instance IDs retain leading zeros and remain distinct on SVG documents',()=>{
  const d=fixture(),p=findProduct(d,'tuya-relay-4ch');
  const a=normalizeModule({id:'K1',productId:p.id,hardwareId:'01'},p);

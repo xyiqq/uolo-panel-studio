@@ -34,6 +34,20 @@ export function moduleIdPrefix(kind) {
   return KIND_PREFIX[kind] || "M";
 }
 
+export function validateIpAddress(value) {
+  const ip=String(value ?? '').trim();
+  if(!ip) return '';
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) && ip.split('.').every(n=>Number(n)<=255)) return ip.split('.').map(Number).join('.');
+  if(ip.includes(':') && /^[0-9a-f:]+$/i.test(ip)) {
+    try { return new URL(`http://[${ip}]/`).hostname.slice(1,-1); } catch { /* Invalid IPv6. */ }
+  }
+  throw new Error('请输入有效的 IPv4 或 IPv6 地址');
+}
+
+export function isNetworkModule(product) {
+  return product?.kind==='gateway' || product?.protocol?.includes('rs485');
+}
+
 export function validateHardwareId(design, moduleId, value) {
   const id=String(value ?? '').trim().toUpperCase();
   if(!id) return '';
@@ -131,6 +145,7 @@ export function normalizeModule(raw, product = null) {
     channelLabels,
     channelTerminals,
     hardwareId: typeof raw.hardwareId === 'string' && /^[0-9a-f]{2}$/i.test(raw.hardwareId.trim()) ? raw.hardwareId.trim().toUpperCase() : '',
+    ipAddress: typeof raw.ipAddress === 'string' ? raw.ipAddress.trim().slice(0,45) : '',
     terminalConnections: raw.terminalConnections && typeof raw.terminalConnections === 'object'
       ? structuredClone(raw.terminalConnections) : {},
     /** 端子关联的继电器模块通道：{ moduleId, channel } */
