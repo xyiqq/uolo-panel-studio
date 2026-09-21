@@ -48,11 +48,28 @@ export function isNetworkModule(product) {
   return product?.kind==='gateway' || product?.protocol?.includes('rs485');
 }
 
+export function moduleAddressMode(module={}) {
+  if(['none','id','ip','both'].includes(module.addressMode)) return module.addressMode;
+  return module.hardwareId ? (module.ipAddress ? 'both' : 'id') : module.ipAddress ? 'ip' : 'none';
+}
+export function visibleModuleAddress(module={}) {
+  const mode=moduleAddressMode(module);
+  return {hardwareId:['id','both'].includes(mode)?module.hardwareId||'':'',ipAddress:['ip','both'].includes(mode)?module.ipAddress||'':''};
+}
+export function setModuleAddressMode(design,moduleId,mode) {
+  if(!['none','id','ip','both'].includes(mode)) throw new Error('无效地址类型');
+  const module=design.modules.find(m=>m.id===moduleId);
+  if(!module) throw new Error('模块不存在');
+  if(['id','both'].includes(mode)) validateHardwareId(design,moduleId,module.hardwareId);
+  if(['ip','both'].includes(mode)) validateIpAddress(module.ipAddress);
+  module.addressMode=mode;
+}
+
 export function validateHardwareId(design, moduleId, value) {
   const id=String(value ?? '').trim().toUpperCase();
   if(!id) return '';
   if(!/^[0-9A-F]{2}$/.test(id)) throw new Error('模块 ID 必须是两位十六进制，例如 01 或 0E');
-  const owner=(design.modules || []).find(m=>m.id!==moduleId && String(m.hardwareId || '').trim().toUpperCase()===id);
+  const owner=(design.modules || []).find(m=>m.id!==moduleId && ['id','both'].includes(moduleAddressMode(m)) && String(m.hardwareId || '').trim().toUpperCase()===id);
   if(owner) throw new Error(`ID ${id} 已被 ${owner.id}（${owner.label || owner.id}）使用`);
   return id;
 }
@@ -144,6 +161,7 @@ export function normalizeModule(raw, product = null) {
     channels,
     channelLabels,
     channelTerminals,
+    addressMode: moduleAddressMode(raw),
     hardwareId: typeof raw.hardwareId === 'string' && /^[0-9a-f]{2}$/i.test(raw.hardwareId.trim()) ? raw.hardwareId.trim().toUpperCase() : '',
     ipAddress: typeof raw.ipAddress === 'string' ? raw.ipAddress.trim().slice(0,45) : '',
     terminalConnections: raw.terminalConnections && typeof raw.terminalConnections === 'object'

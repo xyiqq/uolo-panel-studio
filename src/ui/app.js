@@ -42,7 +42,9 @@ import {
   compactModulePlacement,
   validateHardwareId,
   validateIpAddress,
-  isNetworkModule,
+  moduleAddressMode,
+  visibleModuleAddress,
+  setModuleAddressMode,
 } from "../core/modules.js";
 import { computeBusBudgets } from "../core/buses.js";
 import { auditSmart } from "../core/audit/smart.js";
@@ -149,7 +151,7 @@ function positionLabel(a){return`第 ${a.row+1} 排 · 第 ${a.slot+1} 位`}
 function setNodePosition(a,t){de(e=>{e.positions&&typeof e.positions=="object"||(e.positions={}),t?e.positions[a]={row:t.row,slot:t.slot}:delete e.positions[a];let r=e.circuits.find(s=>s.id===a);r&&(r.position=null)})}
 function gX(){
   kt=compactModulePlacement(Ka(Y),Y),Xe=$s(Y,kt),ts=aX(Xe,Y,Ge);
-  for(const node of kt.nodes) if(node.module) node.product={...node.product,hardwareId:node.module.hardwareId||'',ipAddress:node.module.ipAddress||''};
+  for(const node of kt.nodes) if(node.module) node.product={...node.product,...visibleModuleAddress(node.module)};
   const products=allProducts(Y);
   const budgets=computeBusBudgets(Y,products);
   const smartIssues=auditSmart(Y,kt,budgets,{products,cabinets:allCabinets(Y)}).map(i=>({
@@ -174,6 +176,13 @@ function gX(){
 function applyDesignFromTemplate(tpl){try{let next=materializeTemplate(tpl);Aa.push(ea(Y)),sn=[],Y=next,Ge={power:!1,trip:null},je=Y.circuits[0]?.id||"Q0",EA=null,Y1(),ra(),pe("\u5df2\u5e94\u7528\u6a21\u677f\uff1a"+tpl.name)}catch(err){pe(err.message||String(err))}}
 function openDesignTemplatesDialog(){let user=listUserDesignTemplates();let rows=BUILTIN_DESIGN_TEMPLATES.map(t=>`<div class="library-row"><div class="library-info"><strong>${it(t.name)}</strong><small>${it(t.hint)}</small></div><div class="library-actions"><button class="btn primary" data-apply-builtin="${it(t.id)}">\u5e94\u7528</button></div></div>`).join("");let userRows=user.length?user.map(t=>`<div class="library-row"><div class="library-info"><strong>${it(t.name)}</strong><small>${it(t.hint||"")} \xB7 ${it((t.savedAt||"").slice(0,10))}</small></div><div class="library-actions"><button class="btn primary" data-apply-user="${it(t.id)}">\u5e94\u7528</button><button class="btn danger" data-del-user="${it(t.id)}">\u5220\u9664</button></div></div>`).join(""):'<p class="empty" style="padding:12px">\u6682\u65e0\u7528\u6237\u6a21\u677f\uff1b\u53ef\u5148\u88c5\u914d\u8bbe\u5907\u540e\u70b9\u300c\u5b58\u4e3a\u8bbe\u5907\u6a21\u677f\u300d</p>';MA("\u65b9\u6848\u6a21\u677f",`<p>\u65b0\u5efa\u9ed8\u8ba4\u4e3a\u7a7a\u767d\u7bb1\u4f53\uff08\u4ec5\u603b\u5f00+SPD\uff09\u3002\u5e94\u7528\u6a21\u677f\u4f1a\u66ff\u6362\u5f53\u524d\u65b9\u6848\uff0c\u53ef\u64a4\u9500\u3002</p><h3 style="margin:12px 0 8px;font-size:13px">\u5185\u7f6e</h3>${rows}<h3 style="margin:16px 0 8px;font-size:13px">\u6211\u7684\u6a21\u677f</h3>${userRows}`);document.querySelectorAll("[data-apply-builtin]").forEach(btn=>btn.onclick=()=>{let t=BUILTIN_DESIGN_TEMPLATES.find(x=>x.id===btn.dataset.applyBuiltin);R("#modal").close();if(t)applyDesignFromTemplate(t)});document.querySelectorAll("[data-apply-user]").forEach(btn=>btn.onclick=()=>{let t=listUserDesignTemplates().find(x=>x.id===btn.dataset.applyUser);R("#modal").close();if(t)applyDesignFromTemplate(t)});document.querySelectorAll("[data-del-user]").forEach(btn=>btn.onclick=()=>{deleteUserDesignTemplate(btn.dataset.delUser);openDesignTemplatesDialog();pe("\u5df2\u5220\u9664\u6a21\u677f")})}
 function openSaveAsTemplateDialog(){MA("\u5b58\u4e3a\u8bbe\u5907\u6a21\u677f",`<p>\u4fdd\u5b58\u5f53\u524d\u7bb1\u4f53\u3001\u603b\u5f00/SPD\u3001\u81ea\u5b9a\u4e49\u578b\u53f7\u4e0e ${Y.circuits.length} \u6761\u56de\u8def\u8bbe\u5907\uff08\u4e0d\u5305\u542b\u672a\u5206\u914d\u6e90\u8868\u8d1f\u8377\uff09\u3002</p>${Bt("\u6a21\u677f\u540d\u79f0",`<input id="tpl-name" maxlength="80" value="${it(Y.name+" \u6a21\u677f")}">`)}<button class="btn primary" id="tpl-save">\u4fdd\u5b58\u5230\u672c\u673a</button>`);R("#tpl-save").onclick=()=>{try{let name=R("#tpl-name").value;saveUserDesignTemplate(Y,name);R("#modal").close();pe("\u5df2\u4fdd\u5b58\u6a21\u677f\uff1a"+name.trim())}catch(err){pe(err.message||String(err))}}}
+function moduleAddressFields(m){
+  const mode=moduleAddressMode(m);
+  return Bt('地址类型',`<select id="insp-address-mode" data-address-mode="${it(m.id)}">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],mode)}</select>`)+
+    '<p id="address-mode-error" role="alert" style="color:#bf3030;font-size:11px"></p>'+
+    (['id','both'].includes(mode)?Bt('模块 ID（十六进制）',`<input id="insp-hardware-id" data-hardware-id="${it(m.id)}" value="${it(m.hardwareId||'')}" maxlength="2" placeholder="01 / 0E" aria-describedby="hardware-id-error">`)+'<p id="hardware-id-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'')+
+    (['ip','both'].includes(mode)?Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(m.id)}" value="${it(m.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)+'<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'');
+}
 function ra(){
   gX();
   if(!R('#terminal-wires-toggle')){
@@ -205,6 +214,12 @@ function ra(){
       renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect});
     });
     R('#inspector').addEventListener('change',event=>{
+      const modeInput=event.target.closest('[data-address-mode]');
+      if(modeInput){
+        try{de(d=>setModuleAddressMode(d,modeInput.dataset.addressMode,modeInput.value))}
+        catch(error){modeInput.value=moduleAddressMode(Y.modules.find(m=>m.id===modeInput.dataset.addressMode));R('#address-mode-error').textContent=error.message;pe(error.message)}
+        return;
+      }
       const ipInput=event.target.closest('[data-module-ip]');
       if(ipInput){
         try{
@@ -257,7 +272,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     <section class="side-section"><h3>\u8FDE\u63A5\u8FB9\u754C</h3><p class="condition">RCBO \u540E\u7684 N \u53EA\u8FDB\u5165\u672C\u56DE\u8DEF\u8D1F\u8F7D\uFF1BPE \u4E0D\u7ECF\u8FC7\u4EFB\u4F55\u65AD\u8DEF\u5668\u3001\u6F0F\u4FDD\u6216\u63A5\u89E6\u5668\u3002SPD \u4E3A\u5E76\u8054\u8BBE\u5907\uFF0C\u4EE5 PE \u4E3A\u6CC4\u653E\u7AEF\uFF0C\u4E0D\u6DFB\u52A0\u865A\u5047\u7684\u4E32\u8054\u8D1F\u8F7D\u51FA\u7EBF\u3002</p></section>`,R("#wire-section").onchange=c=>de(v=>v.wireOverrides[f.id]=+c.target.value),R("#wire-reset").onclick=()=>de(c=>delete c.wireOverrides[f.id]),R("#wire-toggle").onclick=()=>de(c=>{c.disconnected=f.connected?[...c.disconnected,f.id]:c.disconnected.filter(v=>v!==f.id)}),Ye()}if(!a){let f=t?.product;return R("#inspector").innerHTML=`<section class="side-section"><div class="section-head"><h2>${it(t?.label||"\u9879\u76EE\u6761\u4EF6")}</h2><span class="tag">${t?.id||"PROJECT"}</span></div>
       ${f?`<div class="inspector-top">${an(f)}<div><strong>${it(f.name)}</strong><small>${f.id}</small></div></div>${VX(f)}
       ${f.kind!=="spd"?`<label class="switch-label" style="margin-top:15px"><input id="node-on" class="switch" type="checkbox" ${Y.states[t.id]!==!1?"checked":""}>\u5408\u95F8 / \u6295\u5165</label>`:""}`:""}
-      ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3>${t.product.kind==='terminal'?'':`${Bt('模块 ID（十六进制）',`<input id="insp-hardware-id" data-hardware-id="${it(t.id)}" value="${it(t.module?.hardwareId||'')}" maxlength="2" placeholder="01 / 0E" aria-describedby="hardware-id-error">`)}<p id="hardware-id-error" role="alert" style="color:#bf3030;font-size:11px"></p>`}${isNetworkModule(t.product)?`${Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(t.id)}" value="${it(t.module?.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)}<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>`:''}<div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
+      ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3>${moduleAddressFields(t.module)}<div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
       ${Bt("共用空开 / 漏保",`<select id="insp-mod-protect">${re(breakerOptions(),t.module?.protectId||"")}</select>`)}
       <button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
       <button class="btn" id="project-settings" style="width:100%;margin-top:12px">${Ut("settings-2")}\u7535\u6E90\u4E0E\u8BBE\u8BA1\u6761\u4EF6</button></section>
@@ -499,8 +514,9 @@ function openModuleDialog(product, existing){
   MA(editing?"编辑模块 "+id:isTerm?"装入菲尼克斯端子":"装入智能模块",`
     <p>${it(product.brand)} · ${it(product.name)} · ${product.channels?product.channels+" 路 · ":""}${product.width!=null?product.width+" mm / "+product.modules+" M":"宽度待核"}</p>
     ${Bt("模块名称",`<input id="mod-label" maxlength="40" value="${it(label)}">`)}
-    ${isTerm?'':Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" pattern="[0-9A-Fa-f]{2}" placeholder="01 / 0E" value="${it(existing?.hardwareId||'')}">`)}
-    ${isNetworkModule(product)?Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`):''}
+    ${Bt('地址类型',`<select id="mod-address-mode">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],moduleAddressMode(existing||{}))}</select>`)}
+    <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" value="${it(existing?.hardwareId||'')}">`)}</div>
+    <div id="mod-ip-field">${Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`)}</div>
     ${isTerm?"":Bt("共用空开 / 漏保",`<select id="mod-protect">${re(breakerOptions(),protectId||"")}</select>`)}
     <div class="${simple||isTerm?"full-only":""}">
       <div class="field-grid">
@@ -517,6 +533,12 @@ function openModuleDialog(product, existing){
       <button class="btn primary" type="button" id="mod-save">${editing?"保存模块":"装入模块"}</button>
     </div>`);
   const feedEl=R("#mod-feed"), feedC=R("#mod-feed-c");
+  const syncAddressFields=()=>{
+    const mode=R('#mod-address-mode').value;
+    R('#mod-id-field').hidden=!['id','both'].includes(mode);
+    R('#mod-ip-field').hidden=!['ip','both'].includes(mode);
+  };
+  R('#mod-address-mode').onchange=syncAddressFields;syncAddressFields();
   if(feedEl&&feedC){
     const syncFeedUI=()=>{feedC.closest("label").style.opacity=feedEl.value==="shared"?"1":".45"};
     feedEl.onchange=syncFeedUI; syncFeedUI();
@@ -553,9 +575,11 @@ function openModuleDialog(product, existing){
     const posRaw=R("#mod-pos").value;
     const pos=posRaw==="auto"?null:{row:+posRaw.split("_")[0],slot:+posRaw.split("_")[1]};
     try{
-      const hardwareId=validateHardwareId(Y,id,R('#mod-hardware-id')?.value||'');
+      const addressMode=R('#mod-address-mode').value;
+      const hardwareId=['id','both'].includes(addressMode)?validateHardwareId(Y,id,R('#mod-hardware-id').value):R('#mod-hardware-id').value;
       const mod=normalizeModule({
-        ipAddress: validateIpAddress(R('#mod-ip-address')?.value ?? existing?.ipAddress),
+        addressMode,
+        ipAddress: ['ip','both'].includes(addressMode)?validateIpAddress(R('#mod-ip-address').value):R('#mod-ip-address').value,
         hardwareId,
         terminalConnections: existing?.terminalConnections,
         id, productId:product.id, label:nextLabel, busId:nextBus||null,

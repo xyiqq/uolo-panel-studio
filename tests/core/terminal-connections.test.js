@@ -3,7 +3,7 @@ import {createBlankDesign, snapshotDesignTemplate, materializeTemplate} from '..
 import {migrateV2ToV3} from '../../src/core/schema/migrate.js';
 import {buildHandoverFiles} from '../../src/core/handover.js';
 import {findProduct,validateDesign,buildAssembly} from '../../src/core/domain.js';
-import {normalizeModule,validateHardwareId,validateIpAddress,isNetworkModule} from '../../src/core/modules.js';
+import {normalizeModule,validateHardwareId,validateIpAddress,isNetworkModule,moduleAddressMode,visibleModuleAddress,setModuleAddressMode} from '../../src/core/modules.js';
 import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '../../src/core/terminal-connections.js';
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
 import {buildPortTemplates} from '../../src/core/ports.js';
@@ -38,7 +38,7 @@ it('hex instance IDs retain leading zeros and remain distinct on SVG documents',
  expect(normalizeModule({...a,hardwareId:'GG'},p).hardwareId).toBe('');
 });
 it('hardware IDs are case-insensitively unique, allow self-edit and release on clearing',()=>{
- const d=fixture();d.modules[1].hardwareId='0E';
+ const d=fixture();d.modules[1].hardwareId='0E';d.modules[1].addressMode='id';
  expect(()=>validateHardwareId(d,'K2','0e')).toThrow('已被 K1');
  expect(validateHardwareId(d,'K1','0e')).toBe('0E');
  expect(()=>validateHardwareId(d,'K2','GG')).toThrow('两位十六进制');
@@ -79,4 +79,22 @@ it('terminal top is FIELD and bottom is PANEL',()=>{
  const ports=buildPortTemplates(p);
  expect(ports.find(p=>p.key==='FIELD1').side).toBe('top');
  expect(ports.find(p=>p.key==='PANEL1').side).toBe('bottom');
+});
+
+it('address modes infer legacy data, retain hidden values and reject reactivation conflicts',()=>{
+ expect(moduleAddressMode({hardwareId:'01'})).toBe('id');
+ expect(moduleAddressMode({ipAddress:'10.0.0.1'})).toBe('ip');
+ expect(moduleAddressMode({hardwareId:'01',ipAddress:'10.0.0.1'})).toBe('both');
+ const d=fixture();const m=d.modules[1];m.hardwareId='01';m.ipAddress='10.0.0.1';
+ setModuleAddressMode(d,'K1','both');
+ setModuleAddressMode(d,'K1','none');
+ expect(visibleModuleAddress(m)).toEqual({hardwareId:'',ipAddress:''});
+ expect(m.hardwareId).toBe('01');expect(m.ipAddress).toBe('10.0.0.1');
+ const tpl=materializeTemplate(snapshotDesignTemplate(d,'地址模板'));
+ expect(tpl.modules[1].addressMode).toBe('none');expect(tpl.modules[1].hardwareId).toBe('01');
+ d.modules.push({...m,id:'K2',addressMode:'id'});
+ expect(()=>setModuleAddressMode(d,'K1','both')).toThrow('已被 K2');
+ expect(m.addressMode).toBe('none');
+ d.modules.pop();setModuleAddressMode(d,'K1','both');
+ expect(visibleModuleAddress(m)).toEqual({hardwareId:'01',ipAddress:'10.0.0.1'});
 });

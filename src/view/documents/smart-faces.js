@@ -4,6 +4,7 @@
  */
 import { moduleFaceSvg } from "../module-face.js";
 import { esc } from "./_util.js";
+import {visibleModuleAddress} from '../../core/modules.js';
 
 /**
  * @param {{ design?: object, assembly?: object }} ctx
@@ -15,7 +16,7 @@ export function renderSmartModuleFaces({ design, assembly } = {}) {
   const products = [];
   const seen = new Set();
   for (const n of nodes) {
-    const p = {...n.product, hardwareId:n.module?.hardwareId || n.product?.hardwareId || '', ipAddress:n.module?.ipAddress || n.product?.ipAddress || '', instanceId:n.id};
+    const p = {...n.product, ...visibleModuleAddress(n.module || n.product), instanceId:n.id};
     if (!n.product || seen.has(n.id)) continue;
     seen.add(n.id);
     products.push(p);
