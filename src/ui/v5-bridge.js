@@ -9,6 +9,7 @@ import { SMART_PRODUCTS } from "../data/products/smart-index.js";
 import { computeSpace } from "../core/space.js";
 import { buildDocumentPack } from "../view/documents/index.js";
 import { buildBom } from "../core/bom.js";
+import {buildDeliveryNet} from '../core/delivery-net.js';
 import { applyLabelRules } from "../core/labels.js";
 import { buildHandoverZip } from "../core/pack.js";
 import { buildHandoverFiles } from "../core/handover.js";
@@ -345,8 +346,8 @@ function buildMatches(design) {
 function collectPack(api, { interactive = false } = {}) {
   const design = api.getDesign();
   const assembly = api.getAssembly();
-  const net = api.getNet();
-  const issues = api.getIssues?.() || [];
+  const net = buildDeliveryNet(design,assembly,api.getNet());
+  const issues = [...(api.getIssues?.() || []),...net.wiringIssues];
   const bom = buildBom(design, assembly, net);
   const labels = applyLabelRules(design, net);
   const matches = buildMatches(design);

@@ -19,6 +19,9 @@ import { renderSmartModuleFaces } from "./smart-faces.js";
 import { findProduct as domainFindProduct } from "../../core/domain.js";
 import {terminalRows} from '../../core/terminal-connections.js';
 import {terminalConnectionSvg} from '../terminal-connections.js';
+import {buildDeliveryNet} from '../../core/delivery-net.js';
+import {buildBom} from '../../core/bom.js';
+import {applyLabelRules} from '../../core/labels.js';
 
 /** 简易布置默认文档页 */
 export const SIMPLE_DOC_PAGE_IDS = new Set([
@@ -27,6 +30,9 @@ export const SIMPLE_DOC_PAGE_IDS = new Set([
   "labels-sheet",
   "channel-list",
   "bom",
+  "wiring-table",
+  "wire-tags",
+  "door-chart",
 ]);
 
 /**
@@ -34,6 +40,8 @@ export const SIMPLE_DOC_PAGE_IDS = new Set([
  * @returns {{ pages: { id: string, title: string, html?: string, svg?: string, pageSize: string }[] }}
  */
 export function buildDocumentPack(ctx = {}) {
+  const deliveryNet=buildDeliveryNet(ctx.design,ctx.assembly,ctx.net);
+  ctx={...ctx,net:deliveryNet,bom:buildBom(ctx.design,ctx.assembly,deliveryNet),labels:applyLabelRules(ctx.design,deliveryNet)};
   const {
     design,
     assembly,
@@ -82,7 +90,7 @@ export function buildDocumentPack(ctx = {}) {
   pages.push({
     id: "door-chart",
     title: "箱门回路总表",
-    html: renderDoorChart({ design, assembly, matches, labels }),
+    html: renderDoorChart({ design, assembly, net, matches, labels }),
     pageSize: "A4",
   });
 
@@ -151,7 +159,7 @@ export function buildDocumentPack(ctx = {}) {
 
   const mode = uiMode || design?.uiMode || "simple";
   if (mode === "simple") {
-    return { pages: pages.filter((p) => SIMPLE_DOC_PAGE_IDS.has(p.id) || p.id.startsWith('terminal-connections-')) };
+    return { pages: pages.filter((p) => SIMPLE_DOC_PAGE_IDS.has(p.id) || p.id.startsWith('terminal-connections-') || p.id.startsWith('system-diagram-')) };
   }
 
   return { pages };

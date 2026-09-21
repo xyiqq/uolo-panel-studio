@@ -12,7 +12,7 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
     const raw = (net?.wires || []).find((x) => x.id === w.id);
     const cid = raw?.circuit || "_common";
     if (!byCircuit.has(cid)) byCircuit.set(cid, []);
-    byCircuit.get(cid).push({ ...w, conductor: raw?.conductor, scope: raw?.scope });
+    byCircuit.get(cid).push({ ...w, wireNo:labels?.wireTag?.(raw)||raw?.wireNo||'', conductor: raw?.conductor, scope: raw?.scope });
   }
 
   let tubeHtml = "";
@@ -20,7 +20,7 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
     tubeHtml += `<h3>${esc(cid === "_common" ? "公共 / 进线" : cid)}</h3><ul class="tag-list">`;
     for (const w of list) {
       tubeHtml +=
-        `<li><code>${esc(w.fromTag)}</code> → <code>${esc(w.toTag)}</code>` +
+        `<li><strong>${esc(w.wireNo)}</strong> <code>${esc(w.fromTag)}</code> → <code>${esc(w.toTag)}</code>` +
         ` <span class="muted">${esc(w.conductor || "")} ${esc(w.scope || "")}</span></li>`;
     }
     tubeHtml += `</ul>`;

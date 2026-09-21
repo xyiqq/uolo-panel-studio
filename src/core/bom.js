@@ -3,7 +3,8 @@
  * 不编造产品参数：器件取自 assembly / design；线长由端子三维坐标推算。
  */
 
-import { productSku, CONDUCTOR_COLORS } from "./domain.js";
+import { productSku, CONDUCTOR_COLORS, matchCircuit } from "./domain.js";
+import {buildDeliveryNet} from './delivery-net.js';
 
 const COLOR_NAME = {
   L1: "黄",
@@ -50,6 +51,7 @@ function addItem(map, item) {
  * @returns {{ items: object[], wires: object[] }}
  */
 export function buildBom(design, assembly, net) {
+  net=buildDeliveryNet(design,assembly,net);
   const itemMap = new Map();
   const wireMap = new Map();
 
@@ -153,10 +155,7 @@ export function buildBom(design, assembly, net) {
   // 箱内导线按截面×颜色汇总
   for (const w of net?.wires || []) {
     // 出箱电缆单独按回路长度估算，不混入箱内
-    const isExternal =
-      w.scope === "负载出线" ||
-      w.scope === "回路独立 PE 端子" ||
-      (w.externalSection != null && w.circuit);
+    const isExternal = w.lengthKind === 'external';
     let meters;
     if (isExternal && w.circuit) {
       // 出箱段：用回路 length（m）计一次芯线；同回路多芯在下方按芯汇总
@@ -172,7 +171,7 @@ export function buildBom(design, assembly, net) {
     const color =
       COLOR_NAME[cond] ||
       (CONDUCTOR_COLORS[cond] ? cond : cond || "未标明");
-    const key = `${section}|${color}`;
+    const key = `${section}|${color}|${isExternal?'external':'internal'}|${w.class||'power'}`;
     const prev = wireMap.get(key);
     if (prev) prev.meters += meters;
     else
@@ -180,17 +179,37 @@ export function buildBom(design, assembly, net) {
         section,
         color,
         meters,
+        note:isExternal?'出箱电缆芯线估算':'箱内连接：端点距离×1.4＋两端预留120mm',
+        lengthKind:isExternal?'external':'internal',
+        class:w.class||'power',
       });
+  }
+
+  // 真实净线止于 X 端子，出箱长度按每回路每根芯线单独且仅统计一次。
+  for(const c of design.circuits||[]) {
+    if(!(Number(c.length)>0)) continue;
+    const external=Object.values(net.ports||{}).filter(p=>p.node===`X-${c.id}`);
+    for(const port of external) {
+      if(net.wires.some(w=>w.lengthKind==='external'&&w.circuit===c.id&&w.conductor===port.conductor)) continue;
+      const wire=net.wires.find(w=>w.to===port.id||w.from===port.id)||net.wires.find(w=>w.circuit===c.id&&w.externalSection!=null);
+      const section=wire?.externalSection??c.wire??matchCircuit(design,c).section??null;
+      const color=COLOR_NAME[port.conductor]||port.conductor;
+      const key=`${section}|${color}|external|power`,prev=wireMap.get(key);
+      if(prev) prev.meters+=Number(c.length);
+      else wireMap.set(key,{section,color,meters:Number(c.length),lengthKind:'external',class:'power',note:'出箱电缆按回路长度逐芯估算；未填写长度的回路不估算'});
+    }
   }
 
   // 总线电缆（若 design.buses 存在）
   for (const b of design?.buses || []) {
     if (b.cableMeters != null && b.cableMeters > 0) {
       const key = `bus|${b.type || b.id || "bus"}`;
+      const previous=wireMap.get(key);
       wireMap.set(key, {
         section: b.section || "总线",
         color: b.type || "总线",
-        meters: Number(b.cableMeters),
+        meters: (previous?.meters||0)+Number(b.cableMeters),
+        note:'总线电缆手动填写长度',
       });
     }
   }

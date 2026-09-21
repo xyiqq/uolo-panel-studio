@@ -107,4 +107,8 @@ export const TUYA_DIN_PRODUCTS = [
     powerInput: "LN",
     ...dinRail({ modules: 2, widthMm: 36, heightMm: 90, depthMm: 60 }),
   }),
-];
+].map((product) => ({
+  ...product,
+  availability: "参数待核：通用/OEM 占位，未对应完整厂家型号",
+  note: "保留旧项目通用占位；涂鸦为平台，Wi-Fi/Zigbee、尺寸、通道及保护功能须按实际 OEM 完整型号核实，不代表同时支持两种协议。",
+}));

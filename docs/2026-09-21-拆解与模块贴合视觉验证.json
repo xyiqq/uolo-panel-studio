@@ -1,0 +1,11 @@
+{
+  "verdict": "pass",
+  "scope": "单模块拆解接线与相邻模块外壳",
+  "evidence": ["_smoke-selected-explosion.png", "_smoke-shell-adjacency.png"],
+  "observations": [
+    "K1 单模块视图仅保留相关空开和 T1 端子，8 路通道与馈线的说明可见。",
+    "拆解导线连续连接移动后的模块与静止端子，标签未超出画布。",
+    "放大正面视图中 K1/K2 主外壳相接，无背景透出的间隙；前脸装饰边框仍保留。"
+  ],
+  "limitations": ["在 1800x1100 桌面视口验证，其他视口未逐一截图。"]
+}

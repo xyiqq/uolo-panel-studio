@@ -25,6 +25,7 @@ export function renderBomPage({ bom } = {}) {
         `<td>${esc(dash(w.section))}</td>` +
         `<td>${esc(w.color)}</td>` +
         `<td>${esc(w.meters)}</td>` +
+        `<td>${esc(w.note||'')}</td>` +
         `</tr>`,
     )
     .join("");
@@ -34,8 +35,8 @@ export function renderBomPage({ bom } = {}) {
     `<table class="doc-table"><thead><tr><th>SKU</th><th>名称</th><th>品牌</th><th>数量</th><th>备注</th></tr></thead>` +
     `<tbody>${itemRows || "<tr><td colspan='5'>无</td></tr>"}</tbody></table></section>` +
     `<section><h2>线材估算</h2>` +
-    `<table class="doc-table"><thead><tr><th>截面</th><th>颜色</th><th>米数</th></tr></thead>` +
-    `<tbody>${wireRows || "<tr><td colspan='3'>无</td></tr>"}</tbody></table>` +
+    `<table class="doc-table"><thead><tr><th>截面</th><th>颜色/线类</th><th>米数</th><th>估算范围</th></tr></thead>` +
+    `<tbody>${wireRows || "<tr><td colspan='4'>无</td></tr>"}</tbody></table>` +
     `<p class="hint">线长按端子三维距离 ×1.4 +120 mm 余量估算；出箱电缆按回路长度计。仅供备料参考。</p></section>`;
 
   return pageShell("物料清单 BOM", body, "doc-bom");

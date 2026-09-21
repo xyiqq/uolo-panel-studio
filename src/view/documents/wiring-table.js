@@ -18,6 +18,7 @@ export function renderWiringTable({ net, labels } = {}) {
         `<td>${esc(fromTag)}</td>` +
         `<td>${esc(toTag)}</td>` +
         `<td>${esc(w.conductor)}</td>` +
+        `<td>${esc(w.class||'power')}</td>` +
         `<td>${esc(dash(w.section))}</td>` +
         `<td>${esc(w.scope || "")}</td>` +
         `<td>${esc(w.circuit || "")}</td>` +
@@ -28,10 +29,10 @@ export function renderWiringTable({ net, labels } = {}) {
     .join("");
 
   const body =
-    `<table class="doc-table">` +
+    (net?.wiringIssues?.length?`<p>${net.wiringIssues.map(i=>esc(i.message||i.text)).join('<br>')}</p>`:'') + `<table class="doc-table">` +
     `<thead><tr>` +
     `<th>导线 ID</th><th>号码管</th><th>起点标签</th><th>终点标签</th>` +
-    `<th>导体</th><th>截面</th><th>范围</th><th>回路</th><th>已接</th>` +
+    `<th>导体</th><th>线类</th><th>截面</th><th>范围</th><th>回路</th><th>已接</th>` +
     `</tr></thead><tbody>${rows}</tbody></table>`;
 
   return pageShell("接线表", body, "doc-wiring-table");

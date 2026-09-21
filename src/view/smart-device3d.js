@@ -134,8 +134,9 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
       : KIND_BODY[product.kind] || "#3a4550";
   const accent = BRAND_ACCENT[product.brand] || product.color || "#7a8a9a";
 
-  // 壳体
-  kit.cube(s, w - 1.2, h - 3, d, 0, 0, d / 2 + 6, body, 1.35, 0.32);
+  // 安装侧面与目录宽度一致，平直侧边避免贴合后仍因缩宽、圆角露出背板。
+  // 前脸与端子细节仍独立倒角，不通过压缩安装间距让相邻机身互相穿插。
+  kit.cube(s, w, h - 3, d, 0, 0, d / 2 + 6, body, 0, 0.32);
   // 前脸凹槽底板（略矮，给横版贴图留准比例）
   const { width: faceW, height: faceH } = moduleFaceSize({ ...product, width: w, height: h });
   kit.cube(s, faceW + 1.5, faceH + 3, 4.5, 0, h * 0.04, d + 8.5, "#1c222b", 0.7, 0.4);

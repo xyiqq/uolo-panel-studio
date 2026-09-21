@@ -20,6 +20,8 @@ import {
   psu,
 } from "./symbols.js";
 import { productSku, PHASES } from "../core/domain.js";
+import { computeBusBudgets } from "../core/buses.js";
+import { circuitModuleChannels, moduleDeliveryLinks } from "./module-delivery-links.js";
 import {
   C,
   FS,
@@ -200,6 +202,12 @@ function renderCircuitColumn(design, assembly, circuit, match, x, y) {
     body += `<rect x="0.6" y="${boxTop}" width="${COL_W - 2.7}" height="${sy - boxTop - 2}" fill="none" stroke="${C.accent}" stroke-width="${LW.thin}" stroke-dasharray="1.6 1.2" rx="1"/>`;
   }
 
+  const sharedChannels = circuitModuleChannels(design, circuit);
+  if (sharedChannels.length) {
+    body += `<text x="${tx}" y="108" font-size="${FS.body}" fill="${C.accent}">${esc(ellipsis(sharedChannels.map(d => `${d.moduleId} CH${d.channel}`).join(' / '), 14))}</text>`;
+    body += `<text x="${tx}" y="112" font-size="${FS.tiny}" fill="${C.faint}">完整关联见模块链路页</text>`;
+  }
+
   // 参数区：标签:值 两色排版，行距统一为 colTextStep
   const ty = (i) => LAYOUT.colTextY0 + i * LAYOUT.colTextStep;
   const field = (i, label, value, valueFill = C.muted) =>
@@ -285,13 +293,7 @@ function renderBusFooter(design, pageIndex, pageCount) {
   const buses = design?.buses || [];
   const left = !buses.length
     ? "总线：本方案未配置智能总线"
-    : `总线：${buses
-        .map((b) => {
-          const used = b.used != null ? b.used : "—";
-          const cap = b.capacity != null ? b.capacity : "—";
-          return `${b.type || b.id || "总线"} 电源 ${b.power || "—"} 预算 ${used}/${cap}`;
-        })
-        .join(" · ")}`;
+    : `总线：${buses.length} 条 · 预算及成员见模块链路页`;
   return (
     `<text x="${MARGIN}" y="${PAGE_H - 4}" font-size="${FS.foot}" fill="${C.faint}">${esc(left)}</text>` +
     `<text x="${PAGE_W / 2}" y="${PAGE_H - 4}" text-anchor="middle" font-size="${FS.foot}" fill="${C.danger}">${esc(DISCLAIMER)}</text>` +
@@ -309,10 +311,34 @@ function renderBusFooter(design, pageIndex, pageCount) {
 export function renderSystemDiagram(design, assembly, net, matches) {
   const matchMap = matches && typeof matches === "object" ? matches : {};
   const circuits = design?.circuits || [];
-  const pageCount = Math.max(1, Math.ceil(circuits.length / COLS_PER_PAGE) || 1);
+  const circuitPageCount = Math.max(1, Math.ceil(circuits.length / COLS_PER_PAGE) || 1);
+  const links = moduleDeliveryLinks(design, net);
+  const budgets = computeBusBudgets(design, (assembly?.nodes || []).map(n => n.product).filter(Boolean));
+  for (const budget of budgets) {
+    const bus = design.buses.find(b => b.id === budget.id);
+    links.push({from:`总线 ${budget.label || budget.id} (${budget.type})`,to:`设备 ${(bus.deviceModuleIds || []).join(' / ') || '—'}`,
+      kind:`电源 ${(bus.psuModuleIds || []).join(' / ') || '未配置'}`,
+      detail:`预算 ${budget.usedKnown ? textOrDash(budget.used) : '待核'}/${budget.capacityKnown ? textOrDash(budget.capacity) : '待核'} ${budget.unit || ''} · ${budget.deviceCount} 台${budget.overBudget ? ' · 超预算' : ''}`});
+  }
+  // Wrap all identifiers instead of truncating them; variable-height rows paginate.
+  const wrapped = value => String(value || '—').match(/.{1,34}/gu) || ['—'];
+  const linkPages = [];
+  let current = [], height = 0;
+  for (const link of links) {
+    const cells = [link.from,link.to,`${link.kind}\n${link.detail}`].map(v => String(v).split('\n').flatMap(wrapped));
+    const lineCount = Math.max(...cells.map(c => c.length));
+    for (let offset=0;offset<lineCount;offset+=48) {
+      const part = cells.map(c => c.slice(offset,offset+48));
+      const rowHeight = Math.max(...part.map(c => c.length)) * 4 + 6;
+      if (current.length && height + rowHeight > 244) { linkPages.push(current); current = []; height = 0; }
+      current.push({link,cells:part,height:rowHeight}); height += rowHeight;
+    }
+  }
+  if (current.length) linkPages.push(current);
+  const pageCount = circuitPageCount + linkPages.length;
   const pages = [];
 
-  for (let pi = 0; pi < pageCount; pi++) {
+  for (let pi = 0; pi < circuitPageCount; pi++) {
     const slice = circuits.slice(pi * COLS_PER_PAGE, (pi + 1) * COLS_PER_PAGE);
     const busX = MARGIN + INLET_W + 4;
     const colStartX = busX + 28;
@@ -345,8 +371,6 @@ export function renderSystemDiagram(design, assembly, net, matches) {
     });
 
     content += renderBusFooter(design, pi, pageCount);
-    // net 仅用于潜在扩展；避免 unused 警告式引用
-    void net;
 
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PAGE_W} ${PAGE_H}" ` +
@@ -356,6 +380,24 @@ export function renderSystemDiagram(design, assembly, net, matches) {
       `</svg>`;
     pages.push(svg);
   }
+
+  linkPages.forEach((rows, index) => {
+    const pi = circuitPageCount + index;
+    let content = renderTitleBar(design,pi,pageCount);
+    content += `<text x="10" y="25" font-size="${FS.section}" fill="${C.ink}">模块链路 · 馈电 / 通道 / 接线端子 / 总线预算</text>`;
+    let y = 32;
+    for (const {link,cells,height} of rows) {
+      content += `<g data-link-from="${esc(link.from)}" data-link-to="${esc(link.to)}"><rect x="10" y="${y}" width="400" height="${height}" fill="${C.card}" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
+      const mid = y + height / 2;
+      content += `<path d="M105 ${mid} H138 M135 ${mid-1.5} L138 ${mid} L135 ${mid+1.5}" fill="none" stroke="${C.accent}" stroke-width="${LW.sym}"/>`;
+      cells.forEach((lines,column) => lines.forEach((line,i) => {
+        content += `<text x="${14 + column * 132}" y="${y + 5 + i * 4}" font-size="${FS.sub}" fill="${C.ink}">${esc(line)}</text>`;
+      }));
+      content += '</g>'; y += height;
+    }
+    content += renderBusFooter(design,pi,pageCount);
+    pages.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PAGE_W} ${PAGE_H}" width="${PAGE_W}mm" height="${PAGE_H}mm" data-page="${pi+1}" font-family="${FONT_STACK}"><rect width="100%" height="100%" fill="${C.paper}"/>${content}</svg>`);
+  });
 
   return { pages };
 }

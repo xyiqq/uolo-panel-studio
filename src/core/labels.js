@@ -67,7 +67,7 @@ export function applyLabelRules(design, net) {
     const prefix = modulePrefix(node.product?.kind);
     if (!prefix) continue;
     moduleCounters[prefix] = (moduleCounters[prefix] || 0) + 1;
-    nodeFace.set(node.id, `${prefix}${moduleCounters[prefix]}`);
+    nodeFace.set(node.id, node.id);
   }
   // 装配节点也可能在 assembly.nodes
   for (const node of net?.assembly?.nodes || []) {
@@ -75,7 +75,7 @@ export function applyLabelRules(design, net) {
     const prefix = modulePrefix(node.product?.kind);
     if (!prefix) continue;
     moduleCounters[prefix] = (moduleCounters[prefix] || 0) + 1;
-    nodeFace.set(node.id, `${prefix}${moduleCounters[prefix]}`);
+    nodeFace.set(node.id, node.id);
   }
 
   // 按回路顺序收集 N / PE / 出箱端子
@@ -125,7 +125,7 @@ export function applyLabelRules(design, net) {
     }
     // 器件端子：节点面标.键
     const face = nodeFace.get(p.node) || p.node;
-    portTags.set(p.id, `${face}.${p.key}`);
+    portTags.set(p.id, p.displayTag || `${face}.${p.key}`);
   }
 
   // 回路保护节点面标
@@ -141,7 +141,7 @@ export function applyLabelRules(design, net) {
   let wireSeq = 0;
   for (const w of net?.wires || []) {
     wireSeq += 1;
-    const tag = tpl(wireTpl, {
+    const tag = w.wireNo || tpl(wireTpl, {
       id: w.id,
       circuit: w.circuit || "",
       conductor: w.conductor || "",

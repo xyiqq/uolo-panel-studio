@@ -94,6 +94,6 @@ describe("handover · 交底包文件集", () => {
     expect(files["方案.json"]).toBeTruthy();
     expect(files["校核记录.json"]).toBeUndefined();
     expect(files["回路计算.csv"]).toBeUndefined();
-    expect(files["端子接线表.csv"]).toBeUndefined();
+    expect(files["端子接线表.csv"]).toBeTruthy();
   });
 });
