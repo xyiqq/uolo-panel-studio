@@ -7,11 +7,23 @@ import {normalizeModule} from '../../src/core/modules.js';
 import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '../../src/core/terminal-connections.js';
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
 import {buildPortTemplates} from '../../src/core/ports.js';
+import {moduleFaceSvg} from '../../src/view/module-face.js';
+import {renderSmartModuleFaces} from '../../src/view/documents/smart-faces.js';
 function fixture(){
  const d=createBlankDesign();
  d.modules=[['T1','phoenix-pt25-gy-4'],['K1','tuya-relay-4ch']].map(([id,productId])=>normalizeModule({id,productId},findProduct(d,productId)));
  return d;
 }
+it('hex instance IDs retain leading zeros and remain distinct on SVG documents',()=>{
+ const d=fixture(),p=findProduct(d,'tuya-relay-4ch');
+ const a=normalizeModule({id:'K1',productId:p.id,hardwareId:'01'},p);
+ const b=normalizeModule({id:'K2',productId:p.id,hardwareId:'0e'},p);
+ expect(a.hardwareId).toBe('01');expect(b.hardwareId).toBe('0E');
+ expect(moduleFaceSvg({...p,hardwareId:b.hardwareId})).toContain('ID 0E');
+ const svg=renderSmartModuleFaces({assembly:{nodes:[{id:a.id,product:p,module:a},{id:b.id,product:p,module:b}]}});
+ expect(svg).toContain('ID 01');expect(svg).toContain('ID 0E');
+ expect(normalizeModule({...a,hardwareId:'GG'},p).hardwareId).toBe('');
+});
 it('independent slices preserve binding across JSON validation and module editing',()=>{
  const d=fixture(), resolve=id=>findProduct(d,id), rows=terminalRows(d,resolve);
  rows[0]={...rows[0],output:'K1:CH1_OUT',loadName:'客厅灯',section:'1.5'};

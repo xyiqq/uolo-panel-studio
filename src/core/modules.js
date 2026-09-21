@@ -121,6 +121,7 @@ export function normalizeModule(raw, product = null) {
     channels,
     channelLabels,
     channelTerminals,
+    hardwareId: typeof raw.hardwareId === 'string' && /^[0-9a-f]{2}$/i.test(raw.hardwareId.trim()) ? raw.hardwareId.trim().toUpperCase() : '',
     terminalConnections: raw.terminalConnections && typeof raw.terminalConnections === 'object'
       ? structuredClone(raw.terminalConnections) : {},
     /** 端子关联的继电器模块通道：{ moduleId, channel } */

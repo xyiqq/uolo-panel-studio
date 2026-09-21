@@ -2,7 +2,7 @@
  * 智能模块面板图（SVG 拼版，非厂家 CAD）
  * 口径：参数化示意 · 非厂家 CAD · 不得直接施工
  */
-import { smartFaceSvg } from "../smart-device3d.js";
+import { moduleFaceSvg } from "../module-face.js";
 import { esc } from "./_util.js";
 
 /**
@@ -15,9 +15,9 @@ export function renderSmartModuleFaces({ design, assembly } = {}) {
   const products = [];
   const seen = new Set();
   for (const n of nodes) {
-    const p = n.product;
-    if (!p || seen.has(p.id)) continue;
-    seen.add(p.id);
+    const p = {...n.product, hardwareId:n.module?.hardwareId || n.product?.hardwareId || '', instanceId:n.id};
+    if (!n.product || seen.has(n.id)) continue;
+    seen.add(n.id);
     products.push(p);
   }
   if (!products.length && design?.customProducts) {
@@ -27,8 +27,8 @@ export function renderSmartModuleFaces({ design, assembly } = {}) {
     .map(
       (p) =>
         `<figure class="smart-face-card">
-      <figcaption><b>${esc(p.brand)}</b> · ${esc(p.name)} · ${p.modules ?? "—"}M</figcaption>
-      ${smartFaceSvg(p, 360, 100)}
+      <figcaption><b>${esc(p.instanceId)}</b> · ${esc(p.brand)} · ${esc(p.name)} · ${p.modules ?? "—"}M</figcaption>
+      ${moduleFaceSvg(p, 360, 150)}
     </figure>`,
     )
     .join("");

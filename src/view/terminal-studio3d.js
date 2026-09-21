@@ -25,8 +25,8 @@ export class TerminalStudio3D extends Studio3D {
       const a = new THREE.Vector3(s.source.x,s.source.y,s.source.z);
       const b = new THREE.Vector3(s.target.x,s.target.y,s.target.z);
       const lane = Math.min(a.y,b.y)-18-(i%12)*5;
-      const z = Math.max(a.z,b.z)+14;
-      addWire([a,new THREE.Vector3(a.x,a.y-10,z),new THREE.Vector3(a.x,lane,z),new THREE.Vector3(b.x,lane,z),new THREE.Vector3(b.x,b.y-10,z),b]);
+      const z = 3;
+      addWire([a,new THREE.Vector3(a.x,a.y-10,a.z),new THREE.Vector3(a.x,a.y-10,z),new THREE.Vector3(a.x,lane,z),new THREE.Vector3(b.x,lane,z),new THREE.Vector3(b.x,b.y-10,z),new THREE.Vector3(b.x,b.y-10,b.z),b]);
       if(s.loadName){
         const f = new THREE.Vector3(s.field.x,s.field.y,s.field.z);
         addWire([f,new THREE.Vector3(f.x,f.y+45,f.z)]);

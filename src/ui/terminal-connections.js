@@ -2,7 +2,7 @@ import {terminalRows, outputOptions, saveTerminalRows, terminalCsv} from '../cor
 import {terminalConnectionSvg, esc} from '../view/terminal-connections.js';
 import '../styles/terminal-connections.css';
 
-export function renderTerminalConnections({root, design, resolve, commit, download}) {
+export function renderTerminalConnections({root, design, resolve, commit, download, terminalId=null}) {
   const rows = terminalRows(design,resolve), outputs = outputOptions(design,resolve);
   const options = (items,current) => items.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(current)?'selected':''}>${esc(t)}</option>`).join('');
   root.innerHTML = `<section class="terminal-editor"><div class="pane-head"><h2>端子连接</h2><div class="tools"><button class="btn" id="terminal-svg">下载 SVG</button><button class="btn" id="terminal-csv">接线 CSV</button><button class="btn primary" id="terminal-save">保存接线</button></div></div>
@@ -13,10 +13,20 @@ export function renderTerminalConnections({root, design, resolve, commit, downlo
       <td><select data-field="output" aria-label="${esc(r.terminalId)}:${r.pole} 下端通道" ${r.color==='blue'?'disabled':''}>${options([['','未连接'],...outputs.map(o=>[o.value,o.label])],r.output)}</select></td>
       <td><input data-field="wireNo" aria-label="线号" maxlength="40" value="${esc(r.wireNo)}"></td>
       <td><select data-field="section" aria-label="线径">${options([['','待核'],...[.5,.75,1,1.5,2.5,4,6].map(n=>[n,n])],r.section ?? '')}</select></td></tr>`).join('')}</tbody></table></div>
-      <div class="terminal-preview">${terminalConnectionSvg(rows)}</div>` : '<p class="empty">尚未安装 PT2.5 端子，请先从产品库装入。</p>'}
+      <div class="terminal-preview">${terminalConnectionSvg(rows.filter(r=>!terminalId||r.terminalId===terminalId))}</div>` : '<p class="empty">尚未安装 PT2.5 端子，请先从产品库装入。</p>'}
     <p class="data-note">功能接线图：上端为设备侧，下端为柜内侧。N / PE、模块馈电及电机正反转互锁需单独配置与核验。</p></section>`;
   const read = () => rows.map((r,i)=>({...r,...Object.fromEntries([...root.querySelectorAll(`[data-connection="${i}"] [data-field]`)].map(el=>[el.dataset.field,el.value]))}));
   const status = root.querySelector('.terminal-status');
+  const refreshOptions = () => {
+    const draft=read();
+    root.querySelectorAll('[data-connection]').forEach((tr,i)=>{
+      const current=draft[i].output;
+      const used=new Set(draft.filter((_,j)=>j!==i).map(r=>r.output).filter(Boolean));
+      tr.querySelector('[data-field="output"]').innerHTML=options([['','未连接'],...outputs.filter(o=>o.value===current||!used.has(o.value)).map(o=>[o.value,o.label])],current);
+      tr.hidden=!!terminalId && rows[i].terminalId!==terminalId;
+    });
+  };
+  refreshOptions();
   root.querySelector('#terminal-save').disabled = !rows.length;
   root.querySelector('#terminal-save').onclick = () => {
     try {
@@ -29,7 +39,8 @@ export function renderTerminalConnections({root, design, resolve, commit, downlo
   root.querySelector('#terminal-csv').onclick=()=>download('端子连接.csv',terminalCsv(read()),'text/csv;charset=utf-8');
   root.querySelector('#terminal-svg').onclick=()=>download('端子连接.svg',terminalConnectionSvg(read()),'image/svg+xml');
   root.querySelector('table')?.addEventListener('change',()=>{
-    root.querySelector('.terminal-preview').innerHTML=terminalConnectionSvg(read());
+    refreshOptions();
+    root.querySelector('.terminal-preview').innerHTML=terminalConnectionSvg(read().filter(r=>!terminalId||r.terminalId===terminalId));
     status.textContent='有未保存的接线修改';
   });
 }
