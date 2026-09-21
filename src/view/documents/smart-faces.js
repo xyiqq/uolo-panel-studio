@@ -16,7 +16,7 @@ export function renderSmartModuleFaces({ design, assembly } = {}) {
   const products = [];
   const seen = new Set();
   for (const n of nodes) {
-    const p = {...n.product, ...visibleModuleAddress(n.module || n.product), instanceId:n.id};
+    const p = {...n.product, ...visibleModuleAddress(n.module || n.product), displayName:n.module?.displayName || n.product?.displayName || '', instanceId:n.id};
     if (!n.product || seen.has(n.id)) continue;
     seen.add(n.id);
     products.push(p);

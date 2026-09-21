@@ -156,6 +156,13 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
   faceMesh.position.set(0, h * 0.04, d + 11.2);
   faceMesh.userData.dynamic = true;
   s.add(faceMesh);
+  if(product.displayName){
+    const noteW=w-8,noteH=7;
+    const noteTex=makeFaceTexture(kit,{...product,faceRole:'module-note'},noteW,noteH);
+    const note=new Yt(kit.geometry(`module-note:${noteW}`,()=>new sr(noteW,noteH)),kit.own(new rr({map:noteTex,toneMapped:false})));
+    note.position.set(0,h*.405,d+11.3);
+    s.add(note);
+  }
 
   // 端子条
   kit.cube(s, w - 6, 5.5, 3.5, 0, h / 2 - 7, d + 4, "#151a20", 1, 0.45);

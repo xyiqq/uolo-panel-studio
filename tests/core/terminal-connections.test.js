@@ -8,12 +8,24 @@ import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '..
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
 import {buildPortTemplates} from '../../src/core/ports.js';
 import {moduleFaceSvg} from '../../src/view/module-face.js';
+import {moduleFaceScene} from '../../src/view/module-face.js';
 import {renderSmartModuleFaces} from '../../src/view/documents/smart-faces.js';
 function fixture(){
  const d=createBlankDesign();
  d.modules=[['T1','phoenix-pt25-gy-4'],['K1','tuya-relay-4ch']].map(([id,productId])=>normalizeModule({id,productId},findProduct(d,productId)));
  return d;
 }
+it('Chinese remarks persist independently of addresses and are escaped in SVG',()=>{
+ const d=fixture(),p=findProduct(d,'crestron-din-dali-2');
+ d.modules=[normalizeModule({id:'GW1',productId:p.id,displayName:'客厅灯光网关',hardwareId:'02',ipAddress:'192.168.0.15'},p)];
+ const restored=materializeTemplate(snapshotDesignTemplate(d,'备注模板'));
+ expect(restored.modules[0].displayName).toBe('客厅灯光网关');
+ const svg=renderSmartModuleFaces({assembly:buildAssembly(restored)});
+ expect(svg).toContain('客厅灯光网关');expect(svg).toContain('#f5cf69');
+ expect(moduleFaceSvg({...p,displayName:'<script>'})).not.toContain('<script>');
+ const scene=moduleFaceScene({...p,faceRole:'module-note',displayName:'客厅灯光网关'},300,50);
+ expect(scene.shapes.some(s=>s.text==='客厅灯光网关')).toBe(true);
+});
 it('gateway IP supports valid IPv4/IPv6, clearing and persisted SVG',()=>{
  expect(validateIpAddress('192.168.1.100')).toBe('192.168.1.100');
  expect(validateIpAddress('2001:db8::1')).toBe('2001:db8::1');

@@ -5,7 +5,7 @@ import {terminalWireSegments} from '../core/terminal-connections.js';
 
 export class TerminalStudio3D extends Studio3D {
   signature(net) {
-    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '']));
+    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || '']));
   }
   build(net, design, runtime, options) {
     super.build(net, design, runtime, options);

@@ -151,7 +151,7 @@ function positionLabel(a){return`第 ${a.row+1} 排 · 第 ${a.slot+1} 位`}
 function setNodePosition(a,t){de(e=>{e.positions&&typeof e.positions=="object"||(e.positions={}),t?e.positions[a]={row:t.row,slot:t.slot}:delete e.positions[a];let r=e.circuits.find(s=>s.id===a);r&&(r.position=null)})}
 function gX(){
   kt=compactModulePlacement(Ka(Y),Y),Xe=$s(Y,kt),ts=aX(Xe,Y,Ge);
-  for(const node of kt.nodes) if(node.module) node.product={...node.product,...visibleModuleAddress(node.module)};
+  for(const node of kt.nodes) if(node.module) node.product={...node.product,...visibleModuleAddress(node.module),displayName:node.module.displayName||''};
   const products=allProducts(Y);
   const budgets=computeBusBudgets(Y,products);
   const smartIssues=auditSmart(Y,kt,budgets,{products,cabinets:allCabinets(Y)}).map(i=>({
@@ -178,7 +178,7 @@ function openDesignTemplatesDialog(){let user=listUserDesignTemplates();let rows
 function openSaveAsTemplateDialog(){MA("\u5b58\u4e3a\u8bbe\u5907\u6a21\u677f",`<p>\u4fdd\u5b58\u5f53\u524d\u7bb1\u4f53\u3001\u603b\u5f00/SPD\u3001\u81ea\u5b9a\u4e49\u578b\u53f7\u4e0e ${Y.circuits.length} \u6761\u56de\u8def\u8bbe\u5907\uff08\u4e0d\u5305\u542b\u672a\u5206\u914d\u6e90\u8868\u8d1f\u8377\uff09\u3002</p>${Bt("\u6a21\u677f\u540d\u79f0",`<input id="tpl-name" maxlength="80" value="${it(Y.name+" \u6a21\u677f")}">`)}<button class="btn primary" id="tpl-save">\u4fdd\u5b58\u5230\u672c\u673a</button>`);R("#tpl-save").onclick=()=>{try{let name=R("#tpl-name").value;saveUserDesignTemplate(Y,name);R("#modal").close();pe("\u5df2\u4fdd\u5b58\u6a21\u677f\uff1a"+name.trim())}catch(err){pe(err.message||String(err))}}}
 function moduleAddressFields(m){
   const mode=moduleAddressMode(m);
-  return Bt('地址类型',`<select id="insp-address-mode" data-address-mode="${it(m.id)}">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],mode)}</select>`)+
+  return Bt('备注名称',`<input id="insp-display-name" data-display-name="${it(m.id)}" value="${it(m.displayName||'')}" maxlength="40" placeholder="例如：客厅灯光网关">`)+Bt('地址类型',`<select id="insp-address-mode" data-address-mode="${it(m.id)}">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],mode)}</select>`)+
     '<p id="address-mode-error" role="alert" style="color:#bf3030;font-size:11px"></p>'+
     (['id','both'].includes(mode)?Bt('模块 ID（十六进制）',`<input id="insp-hardware-id" data-hardware-id="${it(m.id)}" value="${it(m.hardwareId||'')}" maxlength="2" placeholder="01 / 0E" aria-describedby="hardware-id-error">`)+'<p id="hardware-id-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'')+
     (['ip','both'].includes(mode)?Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(m.id)}" value="${it(m.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)+'<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'');
@@ -214,6 +214,8 @@ function ra(){
       renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect});
     });
     R('#inspector').addEventListener('change',event=>{
+      const nameInput=event.target.closest('[data-display-name]');
+      if(nameInput){de(d=>{d.modules.find(m=>m.id===nameInput.dataset.displayName).displayName=nameInput.value.trim().slice(0,40)});return}
       const modeInput=event.target.closest('[data-address-mode]');
       if(modeInput){
         try{de(d=>setModuleAddressMode(d,modeInput.dataset.addressMode,modeInput.value))}
@@ -514,6 +516,7 @@ function openModuleDialog(product, existing){
   MA(editing?"编辑模块 "+id:isTerm?"装入菲尼克斯端子":"装入智能模块",`
     <p>${it(product.brand)} · ${it(product.name)} · ${product.channels?product.channels+" 路 · ":""}${product.width!=null?product.width+" mm / "+product.modules+" M":"宽度待核"}</p>
     ${Bt("模块名称",`<input id="mod-label" maxlength="40" value="${it(label)}">`)}
+    ${Bt('备注名称',`<input id="mod-display-name" maxlength="40" placeholder="例如：客厅灯光网关" value="${it(existing?.displayName||'')}">`)}
     ${Bt('地址类型',`<select id="mod-address-mode">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],moduleAddressMode(existing||{}))}</select>`)}
     <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" value="${it(existing?.hardwareId||'')}">`)}</div>
     <div id="mod-ip-field">${Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`)}</div>
@@ -578,6 +581,7 @@ function openModuleDialog(product, existing){
       const addressMode=R('#mod-address-mode').value;
       const hardwareId=['id','both'].includes(addressMode)?validateHardwareId(Y,id,R('#mod-hardware-id').value):R('#mod-hardware-id').value;
       const mod=normalizeModule({
+        displayName:R('#mod-display-name').value,
         addressMode,
         ipAddress: ['ip','both'].includes(addressMode)?validateIpAddress(R('#mod-ip-address').value):R('#mod-ip-address').value,
         hardwareId,

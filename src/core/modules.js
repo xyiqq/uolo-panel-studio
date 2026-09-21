@@ -162,6 +162,7 @@ export function normalizeModule(raw, product = null) {
     channelLabels,
     channelTerminals,
     addressMode: moduleAddressMode(raw),
+    displayName: typeof raw.displayName === 'string' ? raw.displayName.trim().slice(0,40) : '',
     hardwareId: typeof raw.hardwareId === 'string' && /^[0-9a-f]{2}$/i.test(raw.hardwareId.trim()) ? raw.hardwareId.trim().toUpperCase() : '',
     ipAddress: typeof raw.ipAddress === 'string' ? raw.ipAddress.trim().slice(0,45) : '',
     terminalConnections: raw.terminalConnections && typeof raw.terminalConnections === 'object'
