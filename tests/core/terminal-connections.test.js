@@ -3,7 +3,7 @@ import {createBlankDesign, snapshotDesignTemplate, materializeTemplate} from '..
 import {migrateV2ToV3} from '../../src/core/schema/migrate.js';
 import {buildHandoverFiles} from '../../src/core/handover.js';
 import {findProduct,validateDesign,buildAssembly} from '../../src/core/domain.js';
-import {normalizeModule} from '../../src/core/modules.js';
+import {normalizeModule,validateHardwareId} from '../../src/core/modules.js';
 import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '../../src/core/terminal-connections.js';
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
 import {buildPortTemplates} from '../../src/core/ports.js';
@@ -23,6 +23,14 @@ it('hex instance IDs retain leading zeros and remain distinct on SVG documents',
  const svg=renderSmartModuleFaces({assembly:{nodes:[{id:a.id,product:p,module:a},{id:b.id,product:p,module:b}]}});
  expect(svg).toContain('ID 01');expect(svg).toContain('ID 0E');
  expect(normalizeModule({...a,hardwareId:'GG'},p).hardwareId).toBe('');
+});
+it('hardware IDs are case-insensitively unique, allow self-edit and release on clearing',()=>{
+ const d=fixture();d.modules[1].hardwareId='0E';
+ expect(()=>validateHardwareId(d,'K2','0e')).toThrow('已被 K1');
+ expect(validateHardwareId(d,'K1','0e')).toBe('0E');
+ expect(()=>validateHardwareId(d,'K2','GG')).toThrow('两位十六进制');
+ d.modules[1].hardwareId=validateHardwareId(d,'K1','');
+ expect(validateHardwareId(d,'K2','0E')).toBe('0E');
 });
 it('independent slices preserve binding across JSON validation and module editing',()=>{
  const d=fixture(), resolve=id=>findProduct(d,id), rows=terminalRows(d,resolve);

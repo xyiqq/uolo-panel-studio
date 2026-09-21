@@ -34,6 +34,15 @@ export function moduleIdPrefix(kind) {
   return KIND_PREFIX[kind] || "M";
 }
 
+export function validateHardwareId(design, moduleId, value) {
+  const id=String(value ?? '').trim().toUpperCase();
+  if(!id) return '';
+  if(!/^[0-9A-F]{2}$/.test(id)) throw new Error('模块 ID 必须是两位十六进制，例如 01 或 0E');
+  const owner=(design.modules || []).find(m=>m.id!==moduleId && String(m.hardwareId || '').trim().toUpperCase()===id);
+  if(owner) throw new Error(`ID ${id} 已被 ${owner.id}（${owner.label || owner.id}）使用`);
+  return id;
+}
+
 /**
  * @param {object} design
  * @param {string} kind

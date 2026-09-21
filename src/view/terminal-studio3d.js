@@ -14,7 +14,7 @@ export class TerminalStudio3D extends Studio3D {
     this.terminalWires = group;
     this.scene.add(group);
     const segments = terminalWireSegments(design, net.assembly, id=>findProduct(design,id));
-    const material = new THREE.MeshStandardMaterial({color:'#aa702c',roughness:.5});
+    const material = new THREE.MeshStandardMaterial({color:'#d93636',roughness:.5});
     this.terminalMaterial = material;
     const addWire = points => {
       const path = new THREE.CurvePath();

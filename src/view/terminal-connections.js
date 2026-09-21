@@ -3,7 +3,7 @@ export function terminalConnectionSvg(rows) {
   const width = 800, height = 100 + Math.ceil(Math.max(1,rows.length)/4)*290;
   const cells = rows.map((r,i) => {
     const x = 22 + (i%4)*194, y = 60 + Math.floor(i/4)*290;
-    const color = r.color === 'blue' ? '#2576b8' : '#97611e';
+    const color = r.color === 'blue' ? '#2576b8' : '#d93636';
     const label = (text, yy) => `<text x="${x+84}" y="${yy}" text-anchor="middle" font-size="12" fill="#263b36">${esc(text)}</text>`;
     const name = r.loadName || '未命名设备';
     return `<g><title>${esc(name)} · ${esc(r.output || '下端未连接')}</title>

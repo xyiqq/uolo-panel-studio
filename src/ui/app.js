@@ -40,6 +40,7 @@ import {
   buildChannelWireSchematic,
   linkChannelTerminal,
   compactModulePlacement,
+  validateHardwareId,
 } from "../core/modules.js";
 import { computeBusBudgets } from "../core/buses.js";
 import { auditSmart } from "../core/audit/smart.js";
@@ -201,6 +202,19 @@ function ra(){
       MA('端子连接 '+button.dataset.terminalConnect,'');
       renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect});
     });
+    R('#inspector').addEventListener('change',event=>{
+      const input=event.target.closest('[data-hardware-id]');
+      if(!input) return;
+      try {
+        const id=validateHardwareId(Y,input.dataset.hardwareId,input.value);
+        input.value=id;input.setCustomValidity('');input.removeAttribute('aria-invalid');
+        R('#hardware-id-error').textContent='';
+        de(d=>{d.modules.find(m=>m.id===input.dataset.hardwareId).hardwareId=id});
+      } catch(error){
+        input.setCustomValidity(error.message);input.setAttribute('aria-invalid','true');
+        R('#hardware-id-error').textContent=error.message;pe(error.message);
+      }
+    });
   }
   if(BA==='terminal-connections') renderTerminalConnections({root:R('#pane'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn});
   document.documentElement.dataset.uiMode=getUiMode(Y);
@@ -231,7 +245,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     <section class="side-section"><h3>\u8FDE\u63A5\u8FB9\u754C</h3><p class="condition">RCBO \u540E\u7684 N \u53EA\u8FDB\u5165\u672C\u56DE\u8DEF\u8D1F\u8F7D\uFF1BPE \u4E0D\u7ECF\u8FC7\u4EFB\u4F55\u65AD\u8DEF\u5668\u3001\u6F0F\u4FDD\u6216\u63A5\u89E6\u5668\u3002SPD \u4E3A\u5E76\u8054\u8BBE\u5907\uFF0C\u4EE5 PE \u4E3A\u6CC4\u653E\u7AEF\uFF0C\u4E0D\u6DFB\u52A0\u865A\u5047\u7684\u4E32\u8054\u8D1F\u8F7D\u51FA\u7EBF\u3002</p></section>`,R("#wire-section").onchange=c=>de(v=>v.wireOverrides[f.id]=+c.target.value),R("#wire-reset").onclick=()=>de(c=>delete c.wireOverrides[f.id]),R("#wire-toggle").onclick=()=>de(c=>{c.disconnected=f.connected?[...c.disconnected,f.id]:c.disconnected.filter(v=>v!==f.id)}),Ye()}if(!a){let f=t?.product;return R("#inspector").innerHTML=`<section class="side-section"><div class="section-head"><h2>${it(t?.label||"\u9879\u76EE\u6761\u4EF6")}</h2><span class="tag">${t?.id||"PROJECT"}</span></div>
       ${f?`<div class="inspector-top">${an(f)}<div><strong>${it(f.name)}</strong><small>${f.id}</small></div></div>${VX(f)}
       ${f.kind!=="spd"?`<label class="switch-label" style="margin-top:15px"><input id="node-on" class="switch" type="checkbox" ${Y.states[t.id]!==!1?"checked":""}>\u5408\u95F8 / \u6295\u5165</label>`:""}`:""}
-      ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3><div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
+      ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3>${t.product.kind==='terminal'?'':`${Bt('模块 ID（十六进制）',`<input id="insp-hardware-id" data-hardware-id="${it(t.id)}" value="${it(t.module?.hardwareId||'')}" maxlength="2" placeholder="01 / 0E" aria-describedby="hardware-id-error">`)}<p id="hardware-id-error" role="alert" style="color:#bf3030;font-size:11px"></p>`}<div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
       ${Bt("共用空开 / 漏保",`<select id="insp-mod-protect">${re(breakerOptions(),t.module?.protectId||"")}</select>`)}
       <button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
       <button class="btn" id="project-settings" style="width:100%;margin-top:12px">${Ut("settings-2")}\u7535\u6E90\u4E0E\u8BBE\u8BA1\u6761\u4EF6</button></section>
@@ -526,8 +540,7 @@ function openModuleDialog(product, existing){
     const posRaw=R("#mod-pos").value;
     const pos=posRaw==="auto"?null:{row:+posRaw.split("_")[0],slot:+posRaw.split("_")[1]};
     try{
-      const hardwareId=R('#mod-hardware-id')?.value.trim().toUpperCase()||'';
-      if(hardwareId&&!/^[0-9A-F]{2}$/.test(hardwareId)) throw new Error('模块 ID 必须是两位十六进制，例如 01 或 0E');
+      const hardwareId=validateHardwareId(Y,id,R('#mod-hardware-id')?.value||'');
       const mod=normalizeModule({
         hardwareId,
         terminalConnections: existing?.terminalConnections,
