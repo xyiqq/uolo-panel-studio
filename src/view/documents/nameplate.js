@@ -1,11 +1,11 @@
 import { dash, esc, DISCLAIMER } from "./_util.js";
-import { qrSvg, nameplateQrPayload } from "../qr.js";
+import { qrSvg, nameplateQrPayload, qrMode } from "../qr.js";
 
 /** 铭牌 90×60 mm */
 export function renderNameplate({ design } = {}) {
   const payload = nameplateQrPayload(
     design,
-    design?.publicBaseUrl ? "online" : "offline",
+    qrMode(design),
   );
   const qr = payload ? qrSvg(payload, 72) : "";
   const rev =

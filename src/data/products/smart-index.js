@@ -7,6 +7,7 @@ import { KNX_PRODUCTS } from "./smart-knx.js";
 import { TUYA_DIN_PRODUCTS } from "./smart-tuya-din.js";
 import { MEANWELL_PSU_PRODUCTS } from "./psu-meanwell.js";
 import { DALI_PSU_PRODUCTS } from "./psu-dali.js";
+import { PHOENIX_TERMINAL_PRODUCTS } from "./terminal-phoenix.js";
 
 /** @type {object[]} */
 export const SMART_PRODUCTS = [
@@ -16,6 +17,7 @@ export const SMART_PRODUCTS = [
   ...TUYA_DIN_PRODUCTS,
   ...MEANWELL_PSU_PRODUCTS,
   ...DALI_PSU_PRODUCTS,
+  ...PHOENIX_TERMINAL_PRODUCTS,
 ];
 
 export {
@@ -25,4 +27,5 @@ export {
   TUYA_DIN_PRODUCTS,
   MEANWELL_PSU_PRODUCTS,
   DALI_PSU_PRODUCTS,
+  PHOENIX_TERMINAL_PRODUCTS,
 };

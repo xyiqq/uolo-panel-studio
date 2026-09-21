@@ -1,6 +1,6 @@
 import { dash, esc, pageShell } from "./_util.js";
 import { productSku } from "../../core/domain.js";
-import { qrSvg, circuitQrPayload } from "../qr.js";
+import { qrSvg, circuitQrPayload, qrMode } from "../qr.js";
 
 /** 箱门回路总表 */
 export function renderDoorChart({ design, assembly, matches, labels } = {}) {
@@ -23,7 +23,7 @@ export function renderDoorChart({ design, assembly, matches, labels } = {}) {
           productName: product?.name || "",
           residual: product?.residual,
         },
-        design?.publicBaseUrl ? "online" : "offline",
+        qrMode(design),
       );
       const qr = payload ? qrSvg(payload, 40) : "";
       return (

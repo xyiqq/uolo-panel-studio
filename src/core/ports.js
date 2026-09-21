@@ -74,5 +74,16 @@ export function buildPortTemplates(product) {
     return ports;
   }
 
+  if (kind === "terminal") {
+    const cond = product.conductor === "N" ? "N" : "L";
+    const poles = Math.max(1, Number(product.poles) || Number(product.channels) || 1);
+    for (let i = 1; i <= poles; i++) {
+      const suffix = poles > 1 ? String(i) : "";
+      add(`FIELD${suffix}`, cond, "top", "in", poles > 1 ? i : undefined);
+      add(`PANEL${suffix}`, cond, "bottom", "out", poles > 1 ? i : undefined);
+    }
+    return ports;
+  }
+
   return ports;
 }

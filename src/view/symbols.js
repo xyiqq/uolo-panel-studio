@@ -88,7 +88,7 @@ export function contactor() {
       `<line x1="-2.5" y1="12" x2="2.5" y2="12" stroke-width="${LB}"/>` +
       `<line x1="0" y1="6" x2="0" y2="12" stroke-width="${LW}"/>` +
       `<line x1="0" y1="12" x2="0" y2="18" stroke-width="${LB}"/>` +
-      `<text x="4" y="10" font-size="2.2" fill="#1a1a1a" stroke="none">K</text>`,
+      `<text x="4" y="10" font-size="2" fill="#1a1a1a" stroke="none">K</text>`,
   );
 }
 
@@ -100,7 +100,7 @@ export function relay() {
       `<line x1="0" y1="0" x2="0" y2="3" stroke-width="${LB}"/>` +
       `<line x1="0" y1="15" x2="0" y2="18" stroke-width="${LB}"/>` +
       `<circle cx="0" cy="9" r="1.6" stroke-width="${LW}"/>` +
-      `<text x="5" y="10" font-size="2.2" fill="#1a1a1a" stroke="none">RELAY</text>`,
+      `<text x="4.2" y="10" font-size="2" fill="#1a1a1a" stroke="none">RLY</text>`,
   );
 }
 
@@ -112,7 +112,7 @@ export function dimmer() {
       `<line x1="0" y1="0" x2="0" y2="3" stroke-width="${LB}"/>` +
       `<line x1="0" y1="15" x2="0" y2="18" stroke-width="${LB}"/>` +
       `<path d="M-1.8 11 L0 6 L1.8 11 Z" stroke-width="${LW}"/>` +
-      `<text x="5" y="10" font-size="2.2" fill="#1a1a1a" stroke="none">DIM</text>`,
+      `<text x="4.2" y="10" font-size="2" fill="#1a1a1a" stroke="none">DIM</text>`,
   );
 }
 

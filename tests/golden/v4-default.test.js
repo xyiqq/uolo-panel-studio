@@ -18,7 +18,9 @@ describe("V4 黄金基线（语义名）", () => {
   const issues = [...auditDesign(design, assembly), ...auditWiring(net, design)];
 
   it("产品与源表规模", () => {
-    expect(BUILTIN_PRODUCTS.length).toBe(28);
+    expect(BUILTIN_PRODUCTS.length).toBe(34);
+    const single16 = BUILTIN_PRODUCTS.find((p) => p.id === "A9F74116");
+    expect(single16).toMatchObject({ brand: "Schneider Electric", kind: "mcb", poles: 1, protectedPoles: 1, amps: 16, modules: 1 });
     expect(design.loads.length).toBe(117);
     expect(design.circuits.length).toBe(44);
   });
