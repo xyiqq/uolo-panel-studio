@@ -44,16 +44,16 @@ export class TerminalStudio3D extends Studio3D {
       {
         const f = new THREE.Vector3(s.field.x,s.field.y,s.field.z+targetOffset);
         const labelY=f.y+32+Math.floor(i/4)*14;
-        addWire([f,new THREE.Vector3(f.x,labelY,f.z)]);
         const canvas=document.createElement('canvas');canvas.width=512;canvas.height=64;
         const ctx=canvas.getContext('2d');ctx.fillStyle='#8d2424';ctx.fillRect(0,0,512,64);
         ctx.fillStyle='#ffffff';ctx.font='28px "Microsoft YaHei", sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s.fieldName,256,32,490);
         const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
-        const label=new THREE.Mesh(new THREE.PlaneGeometry(76,9),new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide}));
+        const label=new THREE.Mesh(new THREE.PlaneGeometry(76,9),new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide,depthTest:false,depthWrite:false,transparent:true}));
         // Stagger labels in separate lanes so adjacent 5.2mm terminals stay legible.
         const lx=(i%4-1.5)*(net.assembly.box.width-80)/4;
-        addWire([new THREE.Vector3(f.x,labelY,f.z),new THREE.Vector3(lx-38,labelY,f.z)]);
-        label.position.set(lx,labelY,f.z);label.userData.fieldLabel=true;group.add(label);
+        const routeY=labelY-10;
+        addWire([f,new THREE.Vector3(f.x,routeY,f.z),new THREE.Vector3(lx,routeY,f.z),new THREE.Vector3(lx,labelY-4.5,f.z)]);
+        label.position.set(lx,labelY,f.z);label.renderOrder=20;label.userData.fieldLabel=true;group.add(label);
       }
     });
     this.dirty = true;
