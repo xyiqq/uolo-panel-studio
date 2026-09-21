@@ -35,8 +35,8 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     return { width:W,height:H,w,h,shapes,kind,title:`端子 ${p.marker ?? ''} · 位置标识` };
   }
   if(p.faceRole==='module-note'){
-    rect(0,0,w,h,'#e8eee8');
-    text(p.displayName||'',w/2,h*.69,h*.6,'#21392d',cw,'middle');
+    rect(0,0,w,h,'#23784f');
+    text(p.displayName||'',w/2,h*.69,h*.6,'#ffffff',cw,'middle');
     return {width:W,height:H,w,h,shapes,kind,title:p.displayName||''};
   }
   rect(0,0,w,h,paper); rect(2,2,w-4,h-4,'none',edge,5); rect(pad,10,cw,4,accent);
@@ -115,7 +115,7 @@ export function moduleFaceSvg(product, width=600, height=240) {
   const s=moduleFaceScene(product,width,height);
   const body=s.shapes.map(({tag,text,...attrs})=>`<${tag} ${Object.entries(attrs).map(([k,v])=>`${k}="${esc(v)}"`).join(' ')}>${text===undefined?'':esc(text)}</${tag}>`).join('');
   const note=product.displayName && !product.faceRole ? moduleFaceScene({...product,faceRole:'module-note'},width,32) : null;
-  const header=note?`<rect width="${s.w}" height="40" fill="#e8eee8"/><text x="${s.w/2}" y="27" text-anchor="middle" fill="#21392d" font-size="18">${esc(note.shapes.find(x=>x.tag==='text')?.text)}</text>`:'';
+  const header=note?`<rect width="${s.w}" height="40" fill="#23784f"/><text x="${s.w/2}" y="27" text-anchor="middle" fill="#ffffff" font-size="18">${esc(note.shapes.find(x=>x.tag==='text')?.text)}</text>`:'';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${s.width}" height="${s.height+(note?40*s.height/s.h:0)}" viewBox="0 0 ${s.w} ${s.h+(note?40:0)}" role="img" aria-label="${esc(s.title)}" font-family="${FONT}"><title>${esc(s.title)}</title>${header}<g transform="translate(0 ${note?40:0})">${body}</g></svg>`;
 }
 
