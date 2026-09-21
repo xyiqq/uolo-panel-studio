@@ -173,6 +173,20 @@ function openDesignTemplatesDialog(){let user=listUserDesignTemplates();let rows
 function openSaveAsTemplateDialog(){MA("\u5b58\u4e3a\u8bbe\u5907\u6a21\u677f",`<p>\u4fdd\u5b58\u5f53\u524d\u7bb1\u4f53\u3001\u603b\u5f00/SPD\u3001\u81ea\u5b9a\u4e49\u578b\u53f7\u4e0e ${Y.circuits.length} \u6761\u56de\u8def\u8bbe\u5907\uff08\u4e0d\u5305\u542b\u672a\u5206\u914d\u6e90\u8868\u8d1f\u8377\uff09\u3002</p>${Bt("\u6a21\u677f\u540d\u79f0",`<input id="tpl-name" maxlength="80" value="${it(Y.name+" \u6a21\u677f")}">`)}<button class="btn primary" id="tpl-save">\u4fdd\u5b58\u5230\u672c\u673a</button>`);R("#tpl-save").onclick=()=>{try{let name=R("#tpl-name").value;saveUserDesignTemplate(Y,name);R("#modal").close();pe("\u5df2\u4fdd\u5b58\u6a21\u677f\uff1a"+name.trim())}catch(err){pe(err.message||String(err))}}}
 function ra(){
   gX();
+  if(!R('#terminal-wires-toggle')){
+    const toggle=document.createElement('button');
+    toggle.id='terminal-wires-toggle';toggle.className='ib';
+    toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked','true');
+    toggle.setAttribute('aria-label','显示端子连线');toggle.title='显示端子连线';
+    toggle.innerHTML=Ut('cable');
+    toggle.onclick=()=>{
+      if(!qt) return;
+      qt.terminalWiresVisible=qt.terminalWiresVisible===false;
+      toggle.setAttribute('aria-checked',String(qt.terminalWiresVisible));
+      WA();
+    };
+    R('.canvas-tools').append(toggle);
+  }
   let terminalTab=R('#terminal-connections-tab');
   if(!terminalTab){
     terminalTab=document.createElement('button');

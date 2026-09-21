@@ -46,7 +46,12 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
   line(pad,72,w-pad,72);
   const protocols = (Array.isArray(p.protocol) ? p.protocol : p.protocol ? [p.protocol] : []).map(v=>String(v).toUpperCase());
   const dali = protocols.includes('DALI');
-  text(dali && kind === 'gateway' ? 'DALI INTERFACE' : NAMES[kind] || 'MODULE',pad,94,narrow?10:16,muted);
+  text(dali && kind === 'gateway' ? 'DALI INTERFACE' : NAMES[kind] || 'MODULE',pad,94,narrow?10:16,muted,p.hardwareId?cw*.62:cw);
+  if(p.hardwareId){
+    const badgeW=Math.min(108,cw*.34);
+    rect(w-pad-badgeW,77,badgeW,26,accent,'none',3);
+    text(`ID ${p.hardwareId}`,w-pad-badgeW/2,97,narrow?12:23,'#18252b',badgeW-6,'middle');
+  }
 
   if (protection) {
     rect(pad,108,cw,56,light?'#fffef8':'#111a20',edge,3);
@@ -94,8 +99,7 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
   }
   line(pad,266,w-pad,266);
   const footer = protocols.join(' · ') || (p.modules ? `${p.modules}M · DIN` : 'DIN');
-  text(footer,pad,284,narrow?9:16,muted,p.hardwareId?cw*.65:cw);
-  if(p.hardwareId) text(`ID ${p.hardwareId}`,w-pad-cw*.28,284,narrow?10:19,ink,cw*.28);
+  text(footer,pad,284,narrow?9:16,muted);
   return { width:W,height:H,w,h,shapes,kind,title:`${p.brand||''} ${p.name||model} · 参数化外观示意，非厂家接线图；指示灯不代表实时状态` };
 }
 

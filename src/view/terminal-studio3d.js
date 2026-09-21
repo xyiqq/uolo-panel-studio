@@ -4,6 +4,9 @@ import {findProduct} from '../core/domain.js';
 import {terminalWireSegments} from '../core/terminal-connections.js';
 
 export class TerminalStudio3D extends Studio3D {
+  signature(net) {
+    return super.signature(net) + JSON.stringify(net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '']));
+  }
   build(net, design, runtime, options) {
     super.build(net, design, runtime, options);
     this.clearTerminalWires();
@@ -20,8 +23,7 @@ export class TerminalStudio3D extends Studio3D {
       group.add(mesh);
     };
     segments.forEach((s,i)=>{
-      if(options.wireMode==='none' || options.isolate || options.exploded) return;
-      if(options.wireMode==='selected' && ![s.terminalId,s.output.split(':')[0]].includes(options.selected)) return;
+      if(this.terminalWiresVisible===false || options.isolate || options.exploded) return;
       const a = new THREE.Vector3(s.source.x,s.source.y,s.source.z);
       const b = new THREE.Vector3(s.target.x,s.target.y,s.target.z);
       const lane = Math.min(a.y,b.y)-18-(i%12)*5;

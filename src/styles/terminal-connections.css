@@ -7,3 +7,5 @@
 .terminal-preview{margin-top:22px;overflow:auto;border-top:1px solid #cbd8d0}
 .terminal-preview svg{display:block;width:100%;min-width:640px}
 .nav{overflow-x:auto}
+#terminal-wires-toggle[aria-checked="true"]{background:#d9eee2;color:#1c7555}
+#terminal-wires-toggle[aria-checked="false"]{color:#8b958a}
