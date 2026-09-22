@@ -1,6 +1,5 @@
 import { esc, pageShell } from "./_util.js";
 import { qrSvg, circuitQrPayload, qrMode } from "../qr.js";
-import { productSku } from "../../core/domain.js";
 
 /**
  * 号码管 / 端子条 + 电缆挂牌
@@ -17,13 +16,13 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
 
   let tubeHtml = "";
   for (const [cid, list] of byCircuit) {
-    tubeHtml += `<h3>${esc(cid === "_common" ? "公共 / 进线" : cid)}</h3><ul class="tag-list">`;
+    tubeHtml += `<section><h3>${esc(cid === "_common" ? "公共 / 进线" : cid)}</h3><ul class="tag-list">`;
     for (const w of list) {
       tubeHtml +=
         `<li><strong>${esc(w.wireNo)}</strong> <code>${esc(w.fromTag)}</code> → <code>${esc(w.toTag)}</code>` +
         ` <span class="muted">${esc(w.conductor || "")} ${esc(w.scope || "")}</span></li>`;
     }
-    tubeHtml += `</ul>`;
+    tubeHtml += `</ul></section>`;
   }
 
   // 端子条 XN / XPE / X
@@ -65,8 +64,7 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
         `<div><strong>${esc(c.id)}</strong> ${esc(c.name)}</div>` +
         `<div>${esc(m.cable || "—")} · ${esc(c.length != null ? c.length + " m" : "—")}</div>` +
         `<div>去向：${esc(c.path || "—")}</div>` +
-        `<div>${product ? esc(productSku(product)) : ""}</div>` +
-        (payload ? `<div class="qr-cell">${qrSvg(payload, 48)}</div>` : "") +
+        (payload ? `<div class="qr-cell">${qrSvg(payload, 120)}<small>扫码查看本回路</small></div>` : "") +
         `</div>`
       );
     })
@@ -77,5 +75,5 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
     `<section><h2>端子条</h2>${strip("N 排 XN", groups.XN)}${strip("PE 排 XPE", groups.XPE)}${strip("出箱 X", groups.X)}</section>` +
     `<section><h2>电缆挂牌</h2><div class="cable-grid">${hang}</div></section>`;
 
-  return pageShell("号码管 / 端子条 / 挂牌", body, "doc-wire-tags");
+  return pageShell("导线编号与电缆标签", body, "doc-wire-tags",'号码管是套在导线上的编号；端子条是接线位置的标签；电缆挂牌说明线缆通向哪里。N 表示零线，PE 表示保护地线，L 表示火线。请按编号与接线清单逐一核对。');
 }

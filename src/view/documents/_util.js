@@ -15,11 +15,11 @@ export function dash(v) {
   return String(v);
 }
 
-export function pageShell(title, body, extraClass = "") {
+export function pageShell(title, body, extraClass = "", guide = "") {
   return (
     `<article class="doc-page ${extraClass}">` +
     `<header class="doc-head"><h1>${esc(title)}</h1>` +
     `<p class="doc-disclaimer">${esc(DISCLAIMER)}</p></header>` +
-    `<div class="doc-body">${body}</div></article>`
+    `<div class="doc-body">${guide ? `<p class="doc-guide">${esc(guide)}</p>` : ""}${body}</div></article>`
   );
 }

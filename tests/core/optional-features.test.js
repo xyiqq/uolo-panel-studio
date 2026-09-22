@@ -71,6 +71,14 @@ describe('总线编辑和预算',()=>{
     const wires=bom.wires.filter(w=>w.note.includes('总线电缆'));
     expect(wires).toHaveLength(2);expect(wires.map(w=>w.meters)).toEqual([10,20]);expect(wires[0].note).toContain('RVV 2×1.5');
   });
+  it('部分消耗未知时仍报告已知负荷下限超预算，未知总量不变成零',()=>{
+    const d=fixture();d.modules.push({id:'GW2',productId:'unknown'});
+    saveBus(d,{...input,capacity:10},resolve);
+    d.buses[0].deviceModuleIds.push('GW2');
+    expect(computeBusBudgets(d,products)[0]).toMatchObject({used:null,usedKnown:false,knownUsed:12,capacity:10,overBudget:true});
+    d.buses[0].capacity=24;
+    expect(computeBusBudgets(d,products)[0]).toMatchObject({used:null,usedKnown:false,overBudget:false});
+  });
 });
 
 describe('电气规则正反例',()=>{

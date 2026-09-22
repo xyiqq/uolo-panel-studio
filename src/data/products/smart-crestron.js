@@ -1,5 +1,6 @@
 /**
- * Crestron DIN 系列目录。2026-09-21 官网复核，详见 docs/2026-09-21-Crestron官网参数核查.md。
+ * Crestron DIN 系列目录。外形及负载参数见 docs/2026-09-21-Crestron官网参数核查.md；
+ * 2026-09-22 复核控制侧 24VDC 与负载侧市电，见对应供电核查文档。
  * modules 为导轨预留模位，width 为实际机身宽度；二者不可混用。
  */
 import { makeSmartProduct } from "./_smart-factory.js";
@@ -42,7 +43,8 @@ export const CRESTRON_PRODUCTS = [
     zone: "control",
     channels: 8,
     protocol: ["cresnet"],
-    powerInput: "LN",
+    powerInput: "24vdc",
+    loadPowerInput: "LN",
     ...din(9, 95, 60),
     width: 159,
     busConsumption: { value: 5.4, unit: "W" },
@@ -83,7 +85,9 @@ export const CRESTRON_PRODUCTS = [
     channelAmps: 5,
     amps: 10,
     protocol: ["cresnet"],
-    powerInput: "LN",
+    powerInput: "24vdc",
+    loadPowerInput: "LN",
+    busConsumption: { value: 0.6, unit: "W", condition: "市电缺失时 NET 控制侧功耗" },
     ...din(12, 95, 60),
     source: {
       file: "ss_DIN-1DIMU4",
@@ -103,7 +107,9 @@ export const CRESTRON_PRODUCTS = [
     channelAmps: 5,
     amps: 10,
     protocol: ["cresnet"],
-    powerInput: "LN",
+    powerInput: "24vdc",
+    loadPowerInput: "LN",
+    busConsumption: { value: 0.6, unit: "W", condition: "市电缺失时 NET 控制侧功耗" },
     ...din(12, 95, 60),
     source: {
       file: "DIN-1DIM4 official specifications",
@@ -121,7 +127,8 @@ export const CRESTRON_PRODUCTS = [
     zone: "control",
     channels: 4,
     protocol: ["cresnet", "0-10v"],
-    powerInput: "LN",
+    powerInput: "24vdc",
+    loadPowerInput: "LN",
     ...din(9, 95, 60),
     width: 159,
     channelAmps: 5,
@@ -142,7 +149,9 @@ export const CRESTRON_PRODUCTS = [
     kind: "gateway",
     zone: "control",
     protocol: ["dali", "cresnet", "poe"],
-    powerInput: "cresnet-or-poe",
+    powerInput: "24vdc-or-poe",
+    busConsumption: { value: 9, unit: "W", condition: "内置 DALI 电源模式；外置模式为 2W" },
+    daliPowerSupply: "switchable",
     channels: 2,
     ...din(9, 95, 60),
     width: 159,
@@ -161,7 +170,9 @@ export const CRESTRON_PRODUCTS = [
     kind: "gateway",
     zone: "control",
     protocol: ["dali", "cresnet", "poe"],
-    powerInput: "cresnet-or-poe",
+    powerInput: "24vdc-or-poe",
+    busConsumption: { value: 6, unit: "W" },
+    daliPowerSupply: "internal-only",
     channels: 1,
     modules: 3,
     width: 52.83,
@@ -183,7 +194,8 @@ export const CRESTRON_PRODUCTS = [
     zone: "control",
     channels: 2,
     protocol: ["cresnet"],
-    powerInput: "LN",
+    powerInput: "24vdc",
+    loadPowerInput: "LN",
     ...din(6, 94.2, 59.5),
     width: 106,
     busConsumption: { value: 3, unit: "W" },

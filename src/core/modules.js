@@ -6,7 +6,7 @@
 import { rowAllows } from './row-zones.js';
 import { normalizeSwitchSettings } from './network-switch-settings.js';
 import { normalizePduSettings } from './pdu-settings.js';
-import {canPlaceFootprint,reserveFootprint,placementY} from './placement-footprint.js';
+import {canPlaceFootprint,reserveFootprint,placementY,placementWidth,placementColumns,usePhysicalOccupancy} from './placement-footprint.js';
 
 export const SHARED_MODULE_KINDS = [
   "pdu",
@@ -212,36 +212,69 @@ export function compactModulePlacement(assembly, design) {
   if (!assembly?.nodes || !assembly?.box) return assembly;
   const nodes = assembly.nodes.filter((node) => node.role === "module" && node.module);
   if (!nodes.length) return assembly;
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const span = (p) => Math.max(1, Math.ceil(Number(p?.modules) || Math.ceil((Number(p?.width) || 18) / 18)));
-  const width = (p) => Number(p?.width) > 0 ? p.width : span(p) * 18;
-  const ordered = [...(design?.modules || []).map((m) => byId.get(m.id)), ...nodes].filter((node, i, list) => node && list.indexOf(node) === i);
-  const occupied = assembly.occupied, rows = assembly.box.rows, slots = assembly.box.slots;
-  const movable = nodes.filter((n) => !n.pinned || n.placementError);
-  for (const node of movable) {
-    for (let r = 0; r < rows; r++) for (let s = 0; s < slots; s++) if (occupied[r]?.[s] === node.id) occupied[r][s] = null;
-    node.overflow = false; node.placementError = false;
-    // 手动位置与已有设备冲突时，转为自动寻找首个可用连续位置，避免互相穿插。
-    if (node.pinned) node.pinned = false;
+  const byId = new Map(nodes.map(node => [node.id,node]));
+  const ordered = [...(design?.modules || []).map(m=>byId.get(m.id)),...nodes].filter((n,i,list)=>n&&list.indexOf(n)===i);
+  const {box,occupied}=assembly;
+  usePhysicalOccupancy(occupied,new Set(nodes.map(n=>n.id)));
+  const placed=[];
+  const sameGroup=(a,b)=>!a.product.outletCount&&!b.product.outletCount&&(a.product.kind==='terminal')===(b.product.kind==='terminal');
+  const can=(n,pos)=>canPlaceFootprint(design,n.product,box,occupied,pos,n.id);
+  const adjacent=(n,pos)=>{
+    if(occupied.footprints.some(f=>!byId.has(f.id)&&f.row===pos.row&&f.left<pos.slot*18+placementWidth(n.product)&&f.right>pos.slot*18))return pos;
+    const previous=placed.findLast(p=>p.row===pos.row&&p.slot+placementColumns(p.product)===pos.slot&&sameGroup(p,n));
+    if(!previous)return pos;
+    const packed={...pos,left:previous.x+placementWidth(previous.product)/2+box.slots*9};
+    return can(n,packed)?packed:pos;
+  };
+  const put=(n,pos,pinned)=>{
+    reserveFootprint(n.product,box,occupied,pos,n.id);
+    Object.assign(n,{row:pos.row,slot:pos.slot,x:(pos.left??pos.slot*18)-box.slots*9+placementWidth(n.product)/2,y:placementY(n.product,box,pos.row),pinned,overflow:false,placementError:false});
+    placed.push(n);
+  };
+  // Complete each old adjacent run before inserting a new anchor into space it released.
+  // Sorting roots preserves runs even if the module list is not in installation order.
+  const fixed=ordered.map(n=>({n,pos:design.positions?.[n.id]||n.module.position||(n.pinned?{row:n.row,slot:n.slot}:null)})).filter(f=>f.pos);
+  const successors=f=>fixed.filter(next=>next.pos.row===f.pos.row&&next.pos.slot===f.pos.slot+placementColumns(f.n.product)&&sameGroup(f.n,next.n));
+  const lengths=new Map();
+  const runLength=f=>{
+    if(!lengths.has(f))lengths.set(f,1+Math.max(0,...successors(f).map(runLength)));
+    return lengths.get(f);
+  };
+  const pending=new Set(fixed);
+  for(const root of [...fixed].sort((a,b)=>a.pos.row-b.pos.row||a.pos.slot-b.pos.slot||runLength(b)-runLength(a))){
+    let current=root;
+    while(current&&pending.has(current)){
+      pending.delete(current);
+      const {n,pos:saved}=current,pos=adjacent(n,saved);
+      if(can(n,pos))put(n,pos,true);
+      current=successors(current).filter(f=>pending.has(f)).sort((a,b)=>runLength(b)-runLength(a))[0];
+    }
   }
-  const placed = new Map(nodes.filter((n) => n.pinned && Number.isInteger(n.row) && !n.placementError).map((n) => [n.id, { row: n.row, slot: n.slot }]));
-  const can = (n, p) => canPlaceFootprint(design,n.product,assembly.box,occupied,p,n.id);
-  const put = (n, p) => { if (!p || !can(n, p)) { n.overflow = true; n.placementError = true; n.row = rows; n.slot = 0; return false; } reserveFootprint(n.product,assembly.box,occupied,p,n.id); Object.assign(n, p, { overflow: false, placementError: false }); placed.set(n.id, p); return true; };
-  const free = (n) => { for (let r = 0; r < rows; r++) for (let s = 0; s < slots; s++) if (can(n, { row: r, slot: s })) return { row: r, slot: s }; return null; };
-  for (const n of ordered) {
-    if (!n.pinned && !placed.has(n.id)) put(n, free(n));
+  for(const n of ordered){
+    if(placed.includes(n))continue;
+    let found=null;
+    for(let row=0;row<box.rows&&!found;row++)for(let slot=0;slot<box.slots&&!found;slot++){
+      if(placed.some(p=>p.row===row&&p.slot===slot))continue;
+      const pos=adjacent(n,{row,slot});
+      if(can(n,pos))found=pos;
+    }
+    if(found)put(n,found,false);
+    else Object.assign(n,{row:box.rows,slot:0,overflow:true,placementError:true,pinned:false});
   }
-  for (const n of nodes) if (!n.overflow) { n.x = (n.slot - slots / 2) * 18 + width(n.product) / 2; n.y = placementY(n.product,assembly.box,n.row); }
-  // 相邻槽位的同类器件（端子或非端子模块，包括手动定位）按真实宽度贴合；保留每段首器件的定位。
-  // row/slot 与 occupied 仍表示安装槽位预留，x 表示实际器件中心；空槽或其它设备会断开贴合。
-  for (let r = 0; r < rows; r++) {
-    const line = nodes.filter((n) => !n.overflow && n.row === r).sort((a, b) => a.slot - b.slot);
-    for (let i = 1; i < line.length; i++) {
-      const prev = line[i - 1], cur = line[i];
-      const samePlacementGroup = (prev.product?.kind === "terminal") === (cur.product?.kind === "terminal");
-      if (!prev.product.outletCount && !cur.product.outletCount && samePlacementGroup && cur.slot === prev.slot + span(prev.product)) {
-        cur.x = prev.x + width(prev.product) / 2 + width(cur.product) / 2;
-        cur.y = prev.y;
+  // Terminals share a physical rail strip. Integer anchors must not introduce
+  // gaps between adjacent gray/blue groups after free-space placement.
+  for(let row=0;row<box.rows;row++){
+    const line=placed.filter(n=>n.row===row).sort((a,b)=>a.x-b.x);
+    for(let i=1;i<line.length;i++){
+      const previous=line[i-1],current=line[i];
+      if(previous.product.kind!=='terminal'||current.product.kind!=='terminal')continue;
+      const left=previous.x+placementWidth(previous.product)/2+box.slots*9;
+      const oldLeft=current.x-placementWidth(current.product)/2+box.slots*9;
+      const blocked=occupied.footprints.some(f=>f.row===row&&f.id!==current.id&&f.id!==previous.id&&f.left<oldLeft-1e-7&&f.right>left+1e-7);
+      const pos={row,slot:current.slot,left};
+      if(!blocked&&can(current,pos)){
+        reserveFootprint(current.product,box,occupied,pos,current.id);
+        current.x=left-box.slots*9+placementWidth(current.product)/2;
       }
     }
   }

@@ -13,6 +13,18 @@ function fixture(products = ['crestron-din-8sw8-i', 'crestron-din-1dimu4']) {
 }
 
 describe('module breaker feeds', () => {
+  it('keeps 24V controller inputs separate from the simple-mode mains load feeder', () => {
+    const design=fixture([]);
+    design.customProducts.push({id:'USR-DIMMER',name:'24V dimmer',kind:'dimmer',width:144,height:90,depth:60,modules:8,channels:4,powerInput:'24vdc',loadPowerInput:'LN'});
+    design.modules=[normalizeModule({id:'D1',productId:'USR-DIMMER',protectId:design.circuits[0].id}),normalizeModule({id:'PS1',productId:'meanwell-hdr-100-24n'})];
+    design.buses=[{id:'DC',type:'dc',voltage:24,section:.75,psuModuleIds:['PS1'],deviceModuleIds:['D1']}];
+    const net=buildWiring(design),cid=design.circuits[0].id;
+    expect(net.wires.find(w=>w.moduleFeed&&w.moduleId==='D1'&&w.conductor!=='N')).toMatchObject({from:`${cid}:L1_OUT`,scope:'空开 → 负载供电'});
+    expect(net.wires.find(w=>w.to==='D1:N_IN').from).toBe(`${cid}:N_OUT`);
+    expect(net.wires.find(w=>w.to==='D1:DC+')).toMatchObject({from:'PS1:DC+',class:'dc'});
+    expect(net.wires.find(w=>w.to==='D1:DC-')).toMatchObject({from:'PS1:DC-',class:'dc'});
+    expect(net.internal.some(w=>[w.a,w.b].some(p=>p.startsWith('D1:DC')))).toBe(false);
+  });
   it('does not change designs without shared modules', () => {
     const design = createDefaultDesign(), net = buildWiring(design);
     expect(applyModuleFeeds(net, design)).toBe(net);

@@ -84,7 +84,7 @@ describe("菲尼克斯端子与零线排", () => {
 });
 
 
-it("智能模块与端子自动连续排布", () => {
+it("智能模块与端子自动排布优先利用真实剩余空间", () => {
   const design = createDefaultDesign({ includeMain: false, includeSpd: false, modules: [] });
   const relay8 = findProduct(design, "crestron-din-8sw8-i");
   const relay4 = findProduct(design, "crestron-din-4dimflv4");
@@ -99,8 +99,9 @@ it("智能模块与端子自动连续排布", () => {
   const node = (id) => assembly.nodes.find((item) => item.id === id);
   expect(node("T1").slot).toBe(node("K1").slot + Math.ceil(relay8.width / 18));
   expect(node("T1").row).toBe(node("K1").row);
-  expect(node("K2").row).toBe(node("T2").row);
-  expect(node("T2").slot).toBe(node("K2").slot + Math.ceil(relay4.width / 18));
+  expect(node("T2").row).toBe(node("T1").row);
+  expect(node("T2").x-node("T2").product.width/2).toBeCloseTo(node("T1").x+node("T1").product.width/2);
+  expect(node("K2").row).toBeGreaterThan(node("T2").row);
 });
 
 

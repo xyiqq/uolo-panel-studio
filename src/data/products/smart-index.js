@@ -10,9 +10,11 @@ import { DALI_PSU_PRODUCTS } from "./psu-dali.js";
 import { PHOENIX_TERMINAL_PRODUCTS } from "./terminal-phoenix.js";
 import { NETWORK_SWITCH_PRODUCTS } from "./network-switches.js";
 import { BULL_PDU_PRODUCTS } from './pdu-bull.js';
+import { USMART_PRODUCTS } from './smart-usmart.js';
 
 /** @type {object[]} */
 export const SMART_PRODUCTS = [
+  ...USMART_PRODUCTS,
   ...BULL_PDU_PRODUCTS,
   ...NETWORK_SWITCH_PRODUCTS,
   ...CRESTRON_PRODUCTS,
@@ -25,6 +27,7 @@ export const SMART_PRODUCTS = [
 ];
 
 export {
+  USMART_PRODUCTS,
   CRESTRON_PRODUCTS,
   LUTRON_PRODUCTS,
   KNX_PRODUCTS,

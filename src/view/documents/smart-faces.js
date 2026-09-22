@@ -3,7 +3,7 @@
  * 口径：参数化示意 · 非厂家 CAD · 不得直接施工
  */
 import { moduleFaceSvg } from "../module-face.js";
-import { esc } from "./_util.js";
+import { esc, pageShell } from "./_util.js";
 import {visibleModuleAddress} from '../../core/modules.js';
 
 /**
@@ -28,20 +28,12 @@ export function renderSmartModuleFaces({ design, assembly } = {}) {
     .map(
       (p) =>
         `<figure class="smart-face-card">
-      <figcaption><b>${esc(p.instanceId)}</b> · ${esc(p.brand)} · ${esc(p.name)} · ${p.modules ?? "—"}M</figcaption>
-      ${moduleFaceSvg(p, 360, 150)}
+      <figcaption><b>${esc(p.instanceId)}</b> · ${esc(p.brand)} · ${esc(p.name)} · 占用 ${esc(p.modules ?? "—")} 个模位</figcaption>
+      ${moduleFaceSvg(p, 600, 250)}
     </figure>`,
     )
     .join("");
 
-  return `<section>
-    <h2 style="font:16px sans-serif">智能模块面板图</h2>
-    <p style="font:11px sans-serif;color:#555">参数化 SVG 示意，非厂家专有 CAD 翻模。尺寸取自公开资料或同族占位，不得直接施工。</p>
-    <div style="display:flex;flex-wrap:wrap;gap:12px">${cards || "<p>当前方案未装入智能模块。</p>"}</div>
-  </section>
-  <style>
-    .smart-face-card{break-inside:avoid;margin:0 0 14px}
-    .smart-face-card figcaption{font:12px 'Microsoft YaHei',sans-serif;color:#33403a;margin-bottom:5px}
-    .smart-face-card svg{display:block}
-  </style>`;
+  return pageShell('智能模块面板图', cards || '<p class="doc-empty">当前方案未装入智能模块。</p>', 'doc-smart-faces',
+    '按设备编号对照箱内实物，查看各通道与接口位置。模位表示设备占用的安装宽度；图形为示意，非实际比例或厂家施工图。尺寸与接线须以对应型号的厂家资料为准。');
 }

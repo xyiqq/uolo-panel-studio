@@ -1,0 +1,9 @@
+import {mkdirSync} from 'node:fs';
+mkdirSync('.playwright-cli',{recursive:true});
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+import {writeFileSync} from 'node:fs';
+const b=await chromium.launch({channel:'chrome',headless:true});const p=await b.newPage({viewport:{width:1400,height:1000}});const errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:5173');await p.waitForFunction(()=>window.__PANEL_STATE__?.studio()?.model);
+const result=await p.evaluate(()=>{const s=window.__PANEL_STATE__.studio(),before=s.camera.position.toArray(),render=s.renderer.render.bind(s.renderer),views=[];s.design.showSupplyIllustration=true;s.updateVisibility();const hidden=!s.model.layers.service.visible;s.renderer.render=(scene,camera)=>{views.push({orthographic:camera.isOrthographicCamera===true,rotation:camera.rotation.toArray().slice(0,3),service:s.model.layers.service.visible});return render(scene,camera)};try{return {hidden,jpeg:s.captureDocumentImage(),png:s.screenshot(),views,restored:JSON.stringify(before)===JSON.stringify(s.camera.position.toArray())}}finally{s.renderer.render=render}});
+assert.equal(result.hidden,true);assert.ok(result.views.every(v=>v.orthographic&&v.rotation.every(n=>Math.abs(n)<1e-8)&&!v.service));assert.equal(result.restored,true);assert.match(result.png,/^data:image\/png/);writeFileSync('.playwright-cli/export-front.jpg',Buffer.from(result.jpeg.split(',')[1],'base64'));writeFileSync('.playwright-cli/export-front.png',Buffer.from(result.png.split(',')[1],'base64'));
+const downloading=p.waitForEvent('download');await p.locator('#snapshot').click();const file=await downloading;assert.match(file.suggestedFilename(),/\.png$/);await file.saveAs('.playwright-cli/export-front-button.png');assert.deepEqual(errors,[]);console.log(JSON.stringify({status:'PASS',hidden:result.hidden,views:result.views,restored:result.restored,errors}));await b.close();

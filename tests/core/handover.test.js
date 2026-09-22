@@ -39,7 +39,9 @@ describe("handover · 交底包文件集", () => {
   it("回路 / 接线 / BOM 行数与数据一致", () => {
     expect(circuitRows(design, issues).length).toBe(design.circuits.length + 1);
     expect(wireRows(net, labels).length).toBe(net.wires.length + 1);
-    expect(bomRows(bom).length).toBe(bom.items.length + bom.wires.length + 1);
+    const wireRowsDelivered=bomRows(bom).slice(1+bom.items.length);
+    expect(wireRowsDelivered).toHaveLength(new Set(bom.wires.map(w=>w.lengthKind||'bus')).size);
+    expect(wireRowsDelivered.reduce((sum,row)=>sum+Number(row[2]),0)).toBeCloseTo(bom.wires.reduce((sum,w)=>sum+w.meters,0),1);
   });
 
   it("接线行带两端标签", () => {

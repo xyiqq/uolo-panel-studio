@@ -21,3 +21,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# 本地验收产物（不发布现场照片与临时PDF）
+output/
+docs/_smoke-*.png

@@ -31,6 +31,26 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     while (textWidth(t,fitted) > max && t.length > 1) t = t.slice(0,-2) + '…';
     shapes.push({tag:'text',x,y,fill,'font-size':fitted,'font-weight':600,'text-anchor':anchor,text:t});
   };
+  if (p.interfaceProfile === 'din-tcp' && !p.faceRole) {
+    rect(0,0,w,h,'#f1f2ec');rect(2,2,w-4,h-4,'none','#91a89d',5);
+    rect(pad,12,cw,6,'#267a72');
+    text('USMART',pad,48,23,'#24534c',cw*.65);
+    text('DIN-TCP',pad,78,24,'#253d39',cw);
+    text(`1 × LAN / ${p.serialPorts} × RS-485`,pad,102,15,'#536b60',cw);
+    const portW=Math.min(80,cw*.28),portX=w/2-portW/2;
+    rect(portX,122,portW,58,'#29383c','#73847c',3);
+    rect(portX+6,129,portW-12,35,'#0d181c');
+    for(let i=0;i<8;i++)rect(portX+10+i*(portW-20)/8,130,2,17,'#c4aa67');
+    rect(w/2-9,164,18,8,'#0d181c');text('LAN',w/2,200,14,'#31534a',portW,'middle');
+    const cell=cw/p.serialPorts;
+    for(let i=0;i<p.serialPorts;i++){
+      const x=pad+i*cell;rect(x+3,214,cell-6,34,'#4f8570','#345b4c',2);
+      for(let j=0;j<2;j++)circle(x+cell*(j? .7:.3),230,Math.min(5,cell*.1),'#233c32');
+      text(`485-${i+1}`,x+cell/2,270,Math.min(15,cell*.24),'#31534a',cell-4,'middle');
+    }
+    text('接口位置示意',w/2,291,10,'#6b7d72',cw,'middle');
+    return {width:W,height:H,w,h,shapes,kind,title:`USMART DIN-TCP · 1 网口 / ${p.serialPorts} RS-485`};
+  }
   if (p.faceRole === 'terminal-marker') {
     rect(0,0,w,h,'#eef0e4');
     text(p.marker ?? '',w/2,170,80,'#243733',cw,'middle');
@@ -75,7 +95,9 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
       const label=String(p.switchPortLabels?.[i+1]||'—');
       const chars=[...label],lines=[];for(let j=0;j<chars.length;j+=8)lines.push(chars.slice(j,j+8).join(''));
       const lineHeight=Math.min(24,(cellH-30)/Math.max(1,lines.length));
-      lines.forEach((line,j)=>text(line,x+cellW/2,y+30+(j+.75)*lineHeight,Math.min(19,lineHeight*.8,(cellW-10)/Math.max(1,[...line].length)),'#233b31',cellW-10,'middle'));
+      const widestLine=Math.max(1,...lines.map(line=>textWidth(line,1)));
+      const fontSize=Math.min(19,lineHeight*.8,(cellW-10)/widestLine);
+      lines.forEach((line,j)=>text(line,x+cellW/2,y+30+(j+.75)*lineHeight,fontSize,'#233b31',cellW-10,'middle'));
     }
     return {width:W,height:H,w,h,shapes,kind,title:'交换机网口信息'};
   }
@@ -130,7 +152,9 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     for(let i=0;i<7;i++) { rect(pad,111+i*10,cw,3,'#11191d'); line(pad,115+i*10,w-pad,115+i*10,edge,1); }
     circle(pad+6,205,4,'#64776d'); text('DC',pad+17,209,11,muted,Math.max(10,cw-18));
     rect(pad,224,cw,31,light?'#d6ddd1':'#182025',edge,3);
-    text('OUTPUT',w/2,244,11,muted,cw-6,'middle');
+    const output=p.psuOutput;
+    const outputLabel=output?.voltage ? `${output.voltage}V DC${output.amps!=null?' / '+output.amps+'A':output.milliamps!=null?' / '+output.milliamps+'mA':''}` : 'OUTPUT';
+    text(outputLabel,w/2,244,11,muted,cw-6,'middle');
   } else if (kind==='meter' || kind==='timer') {
     rect(pad,111,cw,88,'#101b1a',edge,5); rect(pad+4,115,cw-8,80,'#c4d0b2','none',3);
     text(kind==='timer' ? '--:--' : '— —',w/2,154,narrow?22:36,'#334b3c',cw-14,'middle');

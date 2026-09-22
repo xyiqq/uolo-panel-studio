@@ -12,6 +12,8 @@ import {terminalRows, terminalCsv} from './terminal-connections.js';
 import {buildDeliveryNet} from './delivery-net.js';
 import {buildBom} from './bom.js';
 import {applyLabelRules} from './labels.js';
+import {deliveryMetadata} from './revisions.js';
+import {buildBomDelivery} from './bom-delivery.js';
 
 /** CSV 文本（BOM + CRLF） */
 export function toCsv(rows) {
@@ -71,17 +73,12 @@ export function wireRows(net, labels) {
 }
 
 /** BOM CSV 行 */
-export function bomRows(bom) {
+export function bomRows(bom, context = {}) {
+  const delivery = buildBomDelivery(bom, context);
   const items = [
-    ["类别", "订单号/规格", "名称", "品牌", "数量", "单位", "备注", "参考价"],
-    ...(bom?.items || []).map((i) => [
-      "器件/附件", i.sku, i.name, i.brand || "", i.qty, i.unit || "个", i.note || "",
-      i.priceReference ?? "",
-    ]),
-    ...(bom?.wires || []).map((w) => [
-      "线材", w.section==null?'截面待核':typeof w.section==='number'?`${w.section} mm²`:String(w.section), w.color ? `${w.color}色导线` : "导线", "",
-      w.meters != null ? Number(w.meters).toFixed(2) : "", "m", w.note || "", "",
-    ]),
+    ["类别", "通用名称", "数量", "单位", "用途 / 位置 / 待核事项"],
+    ...delivery.items.map(i=>['设备/附件（按布置统计，实物选型待确认）',i.name,i.qty,i.unit,i.location]),
+    ...delivery.wires.map(w=>['线材（估算待核）',w.name,w.qty??'待核',w.unit,w.location]),
   ];
   return items;
 }
@@ -98,14 +95,16 @@ export function buildHandoverFiles(ctx = {}) {
   const simple = (design?.uiMode || "simple") === "simple";
   const files = {};
 
-  files["README.txt"] = handoverReadme();
+  const metadata = deliveryMetadata(design);
+  files["README.txt"] = `${handoverReadme()}\n\n方案：${metadata.name}\n方案 ID：${metadata.designId}\n版本：${metadata.revision}\n修订时间：${metadata.at}\n修订摘要：${metadata.summary}`;
+  files['交付清单.json'] = JSON.stringify({ ...metadata, documents: pages.map(p => ({ id: p.id, title: p.title, pageSize: p.pageSize })) }, null, 2);
   files["方案.json"] = JSON.stringify(design, null, 2);
   const terminalConnections = terminalRows(design, id=>findProduct(design,id));
   if(terminalConnections.length) files['端子连接.csv']=terminalCsv(terminalConnections);
   files["通道清单.csv"] = channelRowsToCsv(
     buildChannelRows(design, (id) => findProduct(design, id)),
   );
-  if (bom) files["物料清单.csv"] = toCsv(bomRows(bom));
+  if (bom) files["物料清单.csv"] = toCsv(bomRows(bom,{assembly:deliveryNet.assembly,design}).map((row, index) => [...row, ...(index === 0 ? ['方案 ID', '方案版本', '修订时间'] : [metadata.designId, metadata.revision, metadata.at])]));
   if (standaloneHtml) files["方案-独立HTML.html"] = standaloneHtml;
   files["端子接线表.csv"] = toCsv(wireRows(net, labels));
   if(net.wiringIssues.length) files['配线待核事项.json']=JSON.stringify(net.wiringIssues,null,2);
@@ -120,18 +119,22 @@ export function buildHandoverFiles(ctx = {}) {
   }
 
   pages.forEach((p, i) => {
+    if (p.metadata && (p.metadata.revision !== metadata.revision || p.metadata.at !== metadata.at || p.metadata.designId !== metadata.designId)) {
+      throw new Error('文档版本已过期，请重新生成文档后导出交底包');
+    }
     const idx = String(i + 1).padStart(2, "0");
     if (p.svg) files[`文档/${idx}-${p.id}.svg`] = p.svg;
-    else if (p.html) files[`文档/${idx}-${p.id}.html`] = wrapHtml(p.title, p.html);
+    else if (p.html) files[`文档/${idx}-${p.id}.html`] = wrapHtml(p.title, p.html, p.pageSize, ctx.documentCss);
   });
 
   return files;
 }
 
-function wrapHtml(title, body) {
+function wrapHtml(title, body, size = 'A4', css = '') {
+  const escape = value => String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
   return (
     `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">` +
-    `<title>${String(title || "").replace(/</g, "&lt;")}</title></head>` +
-    `<body>${body}</body></html>`
+    `<title>${escape(title)}</title><style>${String(css).replace(/<\/style/gi, '<\\/style')}</style></head>` +
+    `<body><div id="v5-print-root"><section class="v5-doc-sheet print-sheet page-${escape(size)}" data-size="${escape(size)}">${body}</section></div></body></html>`
   );
 }

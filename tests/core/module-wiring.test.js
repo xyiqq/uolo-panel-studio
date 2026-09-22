@@ -1,6 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {createDefaultDesign,buildWiring,simulate,auditWiring} from '../../src/core/domain.js';
 import {normalizeModule} from '../../src/core/modules.js';
+import {buildPortTemplates} from '../../src/core/ports.js';
 
 function fixture(feed='perChannel') {
   const d=createDefaultDesign();d.uiMode='full';d.includeSpd=false;
@@ -10,6 +11,22 @@ function fixture(feed='perChannel') {
   return d;
 }
 describe('explicit module wiring',()=>{
+  it.each(['relay','dimmer'])('separates 24V controller power from %s load power',kind=>{
+    const d=fixture('shared');
+    d.customProducts.push({id:'USR-CONTROL',kind,name:'24V controller',width:144,height:90,depth:60,modules:8,channels:2,powerInput:'24vdc',loadPowerInput:'LN',protocol:['cresnet']});
+    d.modules[0].productId='USR-CONTROL';
+    d.modules.push(normalizeModule({id:'PS1',productId:'meanwell-hdr-100-24n'}));
+    d.buses=[{id:'DC1',type:'dc',voltage:24,section:.75,psuModuleIds:['PS1'],deviceModuleIds:['K1']}];
+    const n=buildWiring(d),source=d.circuits[2].id;
+    expect(n.wires.find(w=>w.to==='K1:DC+')).toMatchObject({from:'PS1:DC+',class:'dc'});
+    expect(n.wires.find(w=>w.to==='K1:DC-')).toMatchObject({from:'PS1:DC-',class:'dc'});
+    expect(n.wires.find(w=>w.to==='K1:L_IN').from).toBe(`${source}:L1_OUT`);
+    expect(n.wires.find(w=>w.to==='K1:N_IN').from).toBe(`${source}:N_OUT`);
+    expect(n.wires.find(w=>w.to===`X-${d.circuits[0].id}:L1`).from).toBe('K1:CH1_OUT');
+    expect(n.wires.some(w=>w.class==='dc' && /:(BUS|L_|N_|CH)/.test(w.to))).toBe(false);
+    const keys=buildPortTemplates(d.customProducts[0]).map(p=>p.key);
+    expect(keys).toEqual(expect.arrayContaining(['DC+','DC-','BUS+','BUS-','L_IN','N_IN','CH1_IN','CH1_OUT']));
+  });
   it('routes independent channels from their own breaker and preserves switch simulation',()=>{
     const d=fixture(),n=buildWiring(d),a=d.circuits[0].id,b=d.circuits[1].id;
     expect(n.wires.find(w=>w.to==='K1:CH1_IN').from).toBe(`${a}:L1_OUT`);
@@ -63,6 +80,58 @@ describe('explicit module wiring',()=>{
     d.modules.push(normalizeModule({id:'PS2',productId:'mdt-stc-0640-01'}));d.buses[0].psuModuleIds.push('PS2');
     expect(buildWiring(d).wires.filter(w=>w.class==='comms')).toHaveLength(0);
     expect(buildWiring(d).wiringIssues.some(i=>i.code==='BUS_SOURCE_UNRESOLVED')).toBe(true);
+  });
+  it.each(['12vdc','DC12','12 V DC'])('connects HDR-100-12N only to a verified %s input',powerInput=>{
+    const d=fixture();
+    d.customProducts.push({id:'USR-12',kind:'gateway',name:'12V receiver',width:36,height:86,depth:60,modules:2,powerInput});
+    d.modules=[normalizeModule({id:'PS1',productId:'meanwell-hdr-100-12n'}),normalizeModule({id:'CPU',productId:'USR-12'})];
+    d.buses=[{id:'DC1',type:'dc',voltage:12,section:.75,psuModuleIds:['PS1'],deviceModuleIds:['CPU']}];
+    let n=buildWiring(d);
+    expect(n.wires.filter(w=>w.class==='dc')).toHaveLength(2);
+    expect(n.wires.find(w=>w.to==='CPU:DC+')).toMatchObject({from:'PS1:DC+',scope:'12V 模块控制供电'});
+    d.modules[0].productId='meanwell-hdr-100-24n';d.buses[0].voltage=24;
+    n=buildWiring(d);
+    expect(n.wires.filter(w=>w.class==='dc')).toHaveLength(0);
+    expect(n.wiringIssues.some(i=>i.code==='BUS_DEVICE_UNVERIFIED')).toBe(true);
+    d.modules[0].productId='meanwell-hdr-100-12n';d.buses[0].voltage=12;
+    d.customProducts[0].powerInput='112vdc';
+    expect(buildWiring(d).wires.filter(w=>w.class==='dc')).toHaveLength(0);
+  });
+  it('connects DLP-04R to DALI modules and keeps unknown DC inputs pending',()=>{
+    const d=fixture();
+    d.customProducts.push({id:'USR-DALI',kind:'gateway',name:'External-powered DALI device',width:36,height:86,depth:60,modules:2,powerInput:'bus',protocol:['dali']});
+    d.modules=[normalizeModule({id:'PS1',productId:'meanwell-dlp-04r'}),normalizeModule({id:'DA1',productId:'USR-DALI'}),normalizeModule({id:'GW1',productId:'usmart-din-tcp-2rs485'})];
+    d.buses=[{id:'DA',type:'dali',section:1.5,psuModuleIds:['PS1'],deviceModuleIds:['DA1']}];
+    let n=buildWiring(d);
+    expect(n.wires.filter(w=>w.busId==='DA')).toHaveLength(2);
+    expect(n.wires.find(w=>w.to==='DA1:BUS+')).toMatchObject({from:'PS1:BUS+',class:'comms'});
+    d.modules[0].productId='meanwell-hdr-100-24n';
+    d.buses=[{id:'DC',type:'dc',voltage:24,psuModuleIds:['PS1'],deviceModuleIds:['GW1']}];
+    n=buildWiring(d);
+    expect(n.wires.filter(w=>w.class==='dc')).toHaveLength(0);
+    expect(n.wiringIssues.some(i=>i.code==='BUS_DEVICE_UNVERIFIED'&&i.moduleId==='GW1')).toBe(true);
+  });
+  it.each(['internal-only','switchable'])('does not parallel DLP-04R with a %s internal DALI supply',daliPowerSupply=>{
+    const d=fixture();
+    d.customProducts.push({id:'USR-DALI',kind:'gateway',name:'DALI controller',width:36,height:86,depth:60,modules:2,powerInput:'24vdc',protocol:['dali'],daliPowerSupply});
+    d.modules=[normalizeModule({id:'PS1',productId:'meanwell-dlp-04r'}),normalizeModule({id:'DA1',productId:'USR-DALI'})];
+    d.buses=[{id:'DA',type:'dali',section:1.5,psuModuleIds:['PS1'],deviceModuleIds:['DA1']}];
+    const n=buildWiring(d);
+    expect(n.wires.filter(w=>w.busId==='DA')).toHaveLength(0);
+    expect(n.wiringIssues.some(i=>i.code==='DALI_INTERNAL_SUPPLY_CONFLICT'&&i.moduleId==='DA1')).toBe(true);
+  });
+  it.each(['dc','dali'])('rejects different supplies on one receiver across separate %s buses',type=>{
+    const d=fixture(),psu=type==='dc'?'meanwell-hdr-100-24n':'meanwell-dlp-04r';
+    d.customProducts.push({id:'USR-DALI',kind:'gateway',name:'External-powered DALI device',width:36,height:86,depth:60,modules:2,powerInput:'bus',protocol:['dali']});
+    d.modules=[normalizeModule({id:'PS1',productId:psu}),normalizeModule({id:'PS2',productId:psu}),normalizeModule({id:'CPU',productId:type==='dc'?'crestron-din-ap4':'USR-DALI'})];
+    d.buses=['PS1','PS2'].map((id,i)=>({id:`B${i}`,type,voltage:type==='dc'?24:null,section:.75,psuModuleIds:[id],deviceModuleIds:['CPU']}));
+    let n=buildWiring(d);
+    expect(n.wires.filter(w=>w.busId)).toHaveLength(0);
+    expect(n.wiringIssues.some(i=>i.code==='BUS_DEVICE_SOURCE_CONFLICT'&&i.moduleId==='CPU')).toBe(true);
+    d.buses.pop();n=buildWiring(d);
+    expect(n.wires.filter(w=>w.busId)).toHaveLength(2);
+    d.buses[0].deviceModuleIds=[];
+    expect(buildWiring(d).wires.filter(w=>w.busId)).toHaveLength(0);
   });
   it('does not short independent protected neutral sources into a shared module N input',()=>{
     const d=fixture();d.modules[0].productId='crestron-din-1dimu4';

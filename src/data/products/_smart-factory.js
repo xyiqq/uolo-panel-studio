@@ -47,6 +47,8 @@ export function makeSmartProduct(fields) {
     channelAmps: fields.channelAmps ?? null,
     channelWatts: fields.channelWatts ?? null,
     powerInput: fields.powerInput ?? null,
+    loadPowerInput: fields.loadPowerInput ?? null,
+    daliPowerSupply: fields.daliPowerSupply ?? null,
     busConsumption: fields.busConsumption ?? null,
     psuOutput: fields.psuOutput ?? null,
     meter: fields.meter ?? null,

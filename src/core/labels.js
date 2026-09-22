@@ -7,6 +7,27 @@ const DEFAULT_CIRCUIT = "{id} {name}";
 const DEFAULT_FACE = "{id}";
 const DEFAULT_WIRE = "{circuit}-{conductor}";
 
+/** A4 标签纸尺寸（mm）；预设使用明确的边距，打印时必须选择实际大小。 */
+export function normalizeLabelSheet(value = {}) {
+  const preset = ['module', 'a4-30', 'a4-48', 'custom'].includes(value?.preset) ? value.preset : 'module';
+  const defaults = { rows: preset === 'a4-48' ? 12 : 10, columns: preset === 'a4-48' ? 4 : 3,
+    marginTop: 8.5, marginBottom: 8.5, marginLeft: 7, marginRight: 7, gapX: 2, gapY: 0 };
+  const result = { preset, ...defaults };
+  if (preset === 'custom') {
+    for (const key of Object.keys(defaults)) {
+      const n = Number(value[key]);
+      if (value[key] !== '' && value[key] != null && Number.isFinite(n)) result[key] = Math.max(0, n);
+    }
+    result.rows = Math.min(48, Math.max(1, Math.floor(result.rows)));
+    result.columns = Math.min(12, Math.max(1, Math.floor(result.columns)));
+  }
+  result.widthMm = (210 - result.marginLeft - result.marginRight - (result.columns - 1) * result.gapX) / result.columns;
+  result.heightMm = (297 - result.marginTop - result.marginBottom - (result.rows - 1) * result.gapY) / result.rows;
+  if (result.widthMm < 5 || result.heightMm < 5) throw new RangeError('标签纸边距或间距过大，每格宽高至少需要 5 mm');
+  result.capacity = result.rows * result.columns;
+  return result;
+}
+
 function tpl(template, vars) {
   return String(template).replace(/\{(\w+)\}/g, (_, k) =>
     vars[k] != null ? String(vars[k]) : "",

@@ -35,6 +35,19 @@ it('24字端口备注分三行完整绘制，不被省略号截断',()=>{
   expect(scene.shapes.filter(s=>s.tag==='text'&&s.text==='端口信息端口信息')).toHaveLength(3);
 });
 
+it.each(['192.168.1.123','客厅交换机接入点AP01','端口信息'.repeat(6)])('多行备注 %s 使用统一字号且完整容纳',label=>{
+  const p=NETWORK_SWITCH_PRODUCTS[1];
+  const scene=moduleFaceScene({...p,faceRole:'network-port-labels',switchPortLabels:{1:label}},p.width-10,p.depth-12);
+  const lines=scene.shapes.filter(s=>s.tag==='text'&&s.fill==='#233b31'&&s.x===scene.w/16);
+  expect(lines.length).toBeGreaterThan(1);
+  expect(lines.map(s=>s.text).join('')).toBe(label);
+  expect(new Set(lines.map(s=>s['font-size'])).size).toBe(1);
+  for(const line of lines){
+    const width=[...line.text].reduce((sum,c)=>sum+(c.charCodeAt(0)>255?1:.64)*line['font-size'],0);
+    expect(width).toBeLessThanOrEqual(scene.w/8-10+1e-6);
+  }
+});
+
 it.each(['front','up','down'])('只有备注名称时也在%s机身显示独立铭牌',orientation=>{
   const p=networkSwitchProduct(NETWORK_SWITCH_PRODUCTS[3],{switchOrientation:orientation,displayName:'一楼网络中心'});
   const {group}=buildSmartDevice(kit(),p);

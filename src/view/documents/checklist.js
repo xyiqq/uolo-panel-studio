@@ -17,17 +17,17 @@ export function renderChecklist({ design, interactive = false } = {}) {
         const val = st.value != null ? String(st.value) : "";
         const meta = [st.by, st.at].filter(Boolean).join(" · ");
         const box = interactive
-          ? `<input type="checkbox" data-check="${esc(it.id)}" ${checked}/>`
-          : `<input type="checkbox" disabled ${checked}/>`;
+          ? `<span class="check-mirror" aria-hidden="true">${st.checked ? '☑' : '□'}</span><input type="checkbox" aria-label="${esc(it.text)}" data-check="${esc(it.id)}" ${checked}/>`
+          : `<span aria-label="${st.checked ? '已记录' : '待检查'}">${st.checked ? '☑' : '□'}</span>`;
         const value = interactive
-          ? `<input type="text" data-check-value="${esc(it.id)}" value="${esc(val)}" placeholder="记录值">`
-          : esc(val);
+          ? `<span class="check-mirror" aria-hidden="true">${esc(val || '待记录')}</span><input type="text" data-check-value="${esc(it.id)}" value="${esc(val)}" placeholder="记录值">`
+          : esc(val || '待记录');
         return (
           `<tr>` +
           `<td>${box}</td>` +
           `<td>${esc(it.text)}</td>` +
           `<td>${value}</td>` +
-          `<td>${esc(meta)}</td>` +
+          `<td>${esc(meta || '待填写')}</td>` +
           `</tr>`
         );
       })
@@ -35,7 +35,7 @@ export function renderChecklist({ design, interactive = false } = {}) {
     return (
       `<section class="check-sec" data-section="${esc(sec.id)}">` +
       `<h2>${esc(sec.title)}</h2>` +
-      `<table class="doc-table"><thead><tr><th>✓</th><th>检查项</th><th>记录值</th><th>执行</th></tr></thead>` +
+      `<table class="doc-table"><thead><tr><th>记录</th><th>检查事项</th><th>实测值 / 备注</th><th>记录人 / 时间</th></tr></thead>` +
       `<tbody>${rows}</tbody></table></section>`
     );
   }).join("");
@@ -44,5 +44,5 @@ export function renderChecklist({ design, interactive = false } = {}) {
   const head =
     `<p class="hint">已记录 ${done} / ${total} 项。勾选仅为现场记录，不替代持证电工的送电试验与竣工验收。</p>`;
 
-  return pageShell("检查与验收单", head + blocks, "doc-checklist");
+  return pageShell("检查与验收单", head + blocks, "doc-checklist", '按安装前、接线中、送电前顺序核对。由专业人员填写实测值及记录人；不适用的项目请在备注中说明。N 为零线，PE 为保护地线，SELV 为安全特低电压，RCD 为漏电保护器。空白不表示已通过。');
 }
