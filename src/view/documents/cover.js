@@ -1,5 +1,5 @@
 import { dash, esc, pageShell, DISCLAIMER } from "./_util.js";
-import { qrSvg, nameplateQrPayload } from "../qr.js";
+import { qrSvg, nameplateQrPayload, qrMode } from "../qr.js";
 
 /** 封面 HTML */
 export function renderCover({ design, assembly } = {}) {
@@ -14,7 +14,7 @@ export function renderCover({ design, assembly } = {}) {
   const sign = design?.signoff?.designer?.name
     ? `设计 ${design.signoff.designer.name}`
     : "未签认";
-  const payload = nameplateQrPayload(design, design?.publicBaseUrl ? "online" : "offline");
+  const payload = nameplateQrPayload(design, qrMode(design));
   const qr = payload ? qrSvg(payload, 96) : "";
 
   const body =

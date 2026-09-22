@@ -1,6 +1,6 @@
 /**
  * 文档中心汇总
- * ctx = { design, assembly, net, issues, matches, bom, labels }
+ * ctx = { design, assembly, net, issues, matches, bom, labels, uiMode, findProduct }
  */
 
 import { renderCover } from "./cover.js";
@@ -13,8 +13,21 @@ import { renderWiringTable } from "./wiring-table.js";
 import { renderChecklist } from "./checklist.js";
 import { renderAuditList } from "./audit-list.js";
 import { renderBomPage } from "./bom-page.js";
+import { renderChannelList } from "./channel-list.js";
 import { renderSystemDiagram } from "../system-diagram.js";
 import { renderSmartModuleFaces } from "./smart-faces.js";
+import { findProduct as domainFindProduct } from "../../core/domain.js";
+import {terminalRows} from '../../core/terminal-connections.js';
+import {terminalConnectionSvg} from '../terminal-connections.js';
+
+/** 简易布置默认文档页 */
+export const SIMPLE_DOC_PAGE_IDS = new Set([
+  "cover",
+  "nameplate",
+  "labels-sheet",
+  "channel-list",
+  "bom",
+]);
 
 /**
  * @param {object} ctx
@@ -29,9 +42,18 @@ export function buildDocumentPack(ctx = {}) {
     matches = {},
     bom,
     labels,
+    interactive = false,
+    uiMode,
+    findProduct,
   } = ctx;
 
+  const resolver = findProduct || ((id) => domainFindProduct(design, id));
   const pages = [];
+  const connections = terminalRows(design || {}, resolver).filter(r=>r.loadName || r.output);
+  for(let i=0;i<connections.length;i+=8) pages.push({
+    id:`terminal-connections-${i/8+1}`, title:`端子连接 · 第 ${i/8+1} 页`,
+    svg:terminalConnectionSvg(connections.slice(i,i+8)), pageSize:'A4-landscape',
+  });
 
   pages.push({
     id: "cover",
@@ -68,6 +90,13 @@ export function buildDocumentPack(ctx = {}) {
     id: "labels-sheet",
     title: "面标与 PT-D210",
     html: renderLabelsSheet({ design, assembly, labels }),
+    pageSize: "A4",
+  });
+
+  pages.push({
+    id: "channel-list",
+    title: "通道清单",
+    html: renderChannelList({ design, findProduct: resolver }),
     pageSize: "A4",
   });
 
@@ -109,7 +138,7 @@ export function buildDocumentPack(ctx = {}) {
   pages.push({
     id: "checklist",
     title: "检查与验收单",
-    html: renderChecklist({ design }),
+    html: renderChecklist({ design, interactive }),
     pageSize: "A4",
   });
 
@@ -119,6 +148,11 @@ export function buildDocumentPack(ctx = {}) {
     html: renderAuditList({ issues }),
     pageSize: "A4",
   });
+
+  const mode = uiMode || design?.uiMode || "simple";
+  if (mode === "simple") {
+    return { pages: pages.filter((p) => SIMPLE_DOC_PAGE_IDS.has(p.id) || p.id.startsWith('terminal-connections-')) };
+  }
 
   return { pages };
 }

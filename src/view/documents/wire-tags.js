@@ -1,5 +1,5 @@
 import { esc, pageShell } from "./_util.js";
-import { qrSvg, circuitQrPayload } from "../qr.js";
+import { qrSvg, circuitQrPayload, qrMode } from "../qr.js";
 import { productSku } from "../../core/domain.js";
 
 /**
@@ -58,7 +58,7 @@ export function renderWireTags({ design, assembly, net, labels, matches } = {}) 
           productName: product?.name || "",
           residual: product?.residual,
         },
-        design?.publicBaseUrl ? "online" : "offline",
+        qrMode(design),
       );
       return (
         `<div class="cable-tag" data-circuit="${esc(c.id)}">` +

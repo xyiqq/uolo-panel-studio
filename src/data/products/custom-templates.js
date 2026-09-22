@@ -85,6 +85,7 @@ export const CUSTOM_KIND_OPTIONS = [
   ["meter", "智能 · 计量"],
   ["contactor", "智能 · 接触器 / 电机"],
   ["timer", "智能 · 时控"],
+  ["terminal", "附件 · 导轨端子"],
 ];
 
 export const SMART_CUSTOM_KINDS = [
@@ -95,6 +96,7 @@ export const SMART_CUSTOM_KINDS = [
   "meter",
   "contactor",
   "timer",
+  "terminal",
 ];
 
 export const POWER_CUSTOM_KINDS = ["rcbo", "mcb", "rccb", "spd"];

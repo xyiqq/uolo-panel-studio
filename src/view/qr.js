@@ -32,6 +32,16 @@ export function qrSvg(text, size = 64) {
 }
 
 /**
+ * 当前二维码模式：labelRules.qrMode 选在线且填了基址才走在线，否则离线文本。
+ * @param {object} design
+ * @returns {"offline"|"online"}
+ */
+export function qrMode(design) {
+  const wants = design?.labelRules?.qrMode === "online";
+  return wants && design?.publicBaseUrl ? "online" : "offline";
+}
+
+/**
  * 回路二维码载荷
  * @param {object} design
  * @param {object} circuit

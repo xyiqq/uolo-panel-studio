@@ -22,6 +22,7 @@ const KIND_COLOR = {
   psu: "#7a8a5a",
   gateway: "#8a6a5a",
   timer: "#6a7a6a",
+  terminal: "#8a8f96",
 };
 
 /**
@@ -61,6 +62,8 @@ export function makeSmartProduct(fields) {
     availability: hasDim ? VERIFIED_DIM : PENDING,
     source: fields.source ?? { ...PENDING_SOURCE },
     smart: fields.smart ?? true,
+    terminalColor: fields.terminalColor ?? null,
+    conductor: fields.conductor ?? null,
     note:
       fields.note ??
       (hasDim

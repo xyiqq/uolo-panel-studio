@@ -1,0 +1,103 @@
+/**
+ * 简易布置模式样式：隐藏强电相关入口，突出通道与保护连线。
+ */
+html[data-ui-mode="simple"] .full-only,
+html[data-ui-mode="simple"] [data-tab="audit"],
+html[data-ui-mode="simple"] .phase-strip,
+html[data-ui-mode="simple"] #balance,
+html[data-ui-mode="simple"] #auto-wire,
+html[data-ui-mode="simple"] .wire-legend,
+html[data-ui-mode="simple"] #footer-audit,
+html[data-ui-mode="simple"] .sim-label {
+  display: none !important;
+}
+
+html[data-ui-mode="full"] .simple-only {
+  display: none !important;
+}
+
+html[data-ui-mode="simple"] span.full-only {
+  display: none !important;
+}
+html[data-ui-mode="simple"] .protect-schematic.simple-only:not([hidden]) {
+  display: block;
+}
+
+.protect-schematic {
+  position: absolute;
+  left: 16px;
+  bottom: 72px;
+  z-index: 4;
+  max-width: min(420px, 46vw);
+  max-height: 38vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #0f1714 82%, transparent);
+  border: 1px solid color-mix(in srgb, #7dcfb6 35%, transparent);
+  color: #d7ebe3;
+  font-size: 12px;
+  line-height: 1.45;
+  backdrop-filter: blur(8px);
+}
+
+.protect-schematic h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.protect-schematic .pg {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, #7dcfb6 18%, transparent);
+}
+
+.protect-schematic .pg:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.protect-schematic svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.protect-schematic .pg-empty {
+  opacity: 0.65;
+}
+
+.protect-schematic .pg-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  opacity: 0.92;
+}
+
+.protect-schematic .pg-list li {
+  margin: 2px 0;
+}
+
+.ui-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: color-mix(in srgb, #3d8b6e 28%, transparent);
+  color: #b8e6d4;
+}
+
+.channel-label-grid .field {
+  margin-bottom: 6px;
+}
+
+html[data-ui-mode="simple"] .nav [data-tab="wiring"] {
+  /* 端子接线保留但降级文案由 JS 处理；仍可见 */
+}

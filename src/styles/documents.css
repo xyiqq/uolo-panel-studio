@@ -1,0 +1,484 @@
+/**
+ * 文档中心：屏幕预览 + 打印分页样式
+ * 口径：条件性方案 · 非施工合格结论
+ *
+ * 打印尺寸用具名页（named page）按页型切换：
+ *   .page-A4 / .page-A4-landscape / .page-A3-landscape / .page-90x60mm
+ */
+
+/* ---------- 预览容器 ---------- */
+
+.v5-docs-preview {
+  background: #f2f3f1;
+  color: #111;
+  padding: 16px;
+  border-radius: 4px;
+  min-height: 70vh;
+  overflow: auto;
+}
+
+.v5-doc-sheet {
+  background: #fff;
+  margin: 0 auto 20px;
+  padding: 12mm;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  color: #111;
+  font: 12px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.v5-doc-sheet[data-size="A4"] {
+  width: 210mm;
+  min-height: 297mm;
+}
+.v5-doc-sheet[data-size="A4-landscape"] {
+  width: 297mm;
+  min-height: 210mm;
+}
+.v5-doc-sheet[data-size="A3-landscape"] {
+  width: 420mm;
+  min-height: 297mm;
+}
+.v5-doc-sheet[data-size="90x60mm"] {
+  width: 120mm;
+  min-height: 80mm;
+  padding: 6mm;
+}
+
+/* 超宽页在屏幕上缩放以适配预览列 */
+.v5-docs-preview.fit-width .v5-doc-sheet {
+  transform-origin: top left;
+}
+
+.v5-doc-sheet svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.v5-doc-caption {
+  font: 600 12px/1.4 "Microsoft YaHei", sans-serif;
+  color: #46584c;
+  margin: 0 auto 6px;
+  padding-left: 2px;
+}
+
+/* ---------- 页面通用 ---------- */
+
+.doc-page {
+  break-inside: auto;
+}
+
+.doc-head {
+  border-bottom: 1.5px solid #222;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.doc-head h1 {
+  font-size: 16px;
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.doc-disclaimer {
+  margin: 0;
+  font-size: 10px;
+  color: #8a5a12;
+  border: 1px solid #d9b57a;
+  background: #fdf6e8;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.doc-body {
+  font-size: 11px;
+}
+
+.doc-body h2 {
+  font-size: 12.5px;
+  margin: 12px 0 6px;
+  padding-left: 6px;
+  border-left: 3px solid #3d6b52;
+}
+
+.doc-body .hint,
+.doc-body .muted {
+  font-size: 10px;
+  color: #666;
+  margin: 2px 0 6px;
+}
+
+/* ---------- 表格 ---------- */
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+  table-layout: auto;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 0.5px solid #999;
+  padding: 3px 5px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.doc-table thead th {
+  background: #e8ece9;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doc-table tbody tr:nth-child(even) td {
+  background: #fafbfa;
+}
+
+.doc-table thead {
+  display: table-header-group;
+}
+
+.doc-table tr {
+  break-inside: avoid;
+}
+
+/* ---------- 封面 ---------- */
+
+.doc-cover .doc-body {
+  padding-top: 24mm;
+}
+
+.cover {
+  text-align: left;
+}
+
+.cover-kicker {
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: #5a6b60;
+  margin: 0 0 6px;
+}
+
+.cover-title {
+  font-size: 30px;
+  margin: 0 0 18px;
+  line-height: 1.25;
+}
+
+.cover-meta {
+  margin: 0 0 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+}
+
+.cover-meta > div {
+  display: flex;
+  gap: 10px;
+  border-bottom: 0.5px dotted #aaa;
+  padding: 4px 0;
+}
+
+.cover-meta dt {
+  width: 56px;
+  color: #666;
+  font-size: 10px;
+  flex: none;
+}
+
+.cover-meta dd {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cover-qr {
+  margin: 12px 0;
+}
+
+.cover-note {
+  margin-top: 24px;
+  padding: 8px 10px;
+  border: 1px solid #d9b57a;
+  background: #fdf6e8;
+  font-size: 10.5px;
+  color: #6b4a10;
+}
+
+/* ---------- 面标 ---------- */
+
+.face-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm;
+  align-content: flex-start;
+}
+
+.face-label {
+  border: 0.4px dashed #888;
+  height: 12mm;
+  box-sizing: border-box;
+  padding: 1mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.face-cut {
+  display: none;
+}
+
+.face-id {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.face-name {
+  font-size: 6.5px;
+  color: #333;
+  line-height: 1.15;
+  word-break: break-all;
+}
+
+.pt-list {
+  font: 10px/1.5 Consolas, "Courier New", monospace;
+  background: #f5f6f5;
+  border: 0.5px solid #ccc;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+/* ---------- 号码管 / 端子 / 挂牌 ---------- */
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm;
+}
+
+.tag-list > * {
+  border: 0.4px solid #999;
+  padding: 0.8mm 1.5mm;
+  font-size: 8px;
+  break-inside: avoid;
+}
+
+.term-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm;
+  margin-bottom: 4mm;
+}
+
+.cable-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm;
+}
+
+.cable-tag {
+  border: 0.5px solid #666;
+  width: 52mm;
+  padding: 2mm;
+  font-size: 8.5px;
+  display: flex;
+  gap: 2mm;
+  align-items: center;
+  break-inside: avoid;
+}
+
+.cable-tag svg,
+.qr-cell svg {
+  flex: none;
+}
+
+.qr-cell {
+  text-align: center;
+}
+
+/* ---------- 铭牌 ---------- */
+
+.doc-nameplate {
+  width: 90mm;
+  height: 60mm;
+  box-sizing: border-box;
+}
+
+.nameplate {
+  border: 0.8px solid #222;
+  padding: 3mm;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  position: relative;
+}
+
+.np-brand {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: #555;
+}
+
+.np-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.np-meta {
+  font-size: 8.5px;
+  color: #333;
+  line-height: 1.6;
+}
+
+.np-qr {
+  position: absolute;
+  right: 3mm;
+  bottom: 3mm;
+}
+
+.np-disclaimer {
+  margin-top: auto;
+  font-size: 7px;
+  color: #8a5a12;
+}
+
+/* ---------- 检查单（可交互） ---------- */
+
+.check-sec {
+  break-inside: avoid;
+  margin-bottom: 8px;
+}
+
+.doc-checklist .doc-table td:first-child,
+.doc-checklist .doc-table th:first-child {
+  width: 22px;
+  text-align: center;
+}
+
+.doc-checklist input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+}
+
+.doc-checklist input[type="text"] {
+  width: 100%;
+  border: none;
+  border-bottom: 0.5px solid #bbb;
+  font: inherit;
+  background: transparent;
+  padding: 0 2px;
+}
+
+/* ---------- 系统图交互 ---------- */
+
+.v5-doc-sheet svg [data-circuit] {
+  cursor: pointer;
+}
+
+.v5-doc-sheet svg [data-circuit]:hover {
+  outline: none;
+}
+
+.v5-doc-sheet svg [data-circuit]:hover rect:first-of-type {
+  fill: #eef6f1;
+}
+
+/* ---------- 打印 ---------- */
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@page page-a4 {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@page page-a4-landscape {
+  size: A4 landscape;
+  margin: 8mm;
+}
+
+@page page-a3-landscape {
+  size: A3 landscape;
+  margin: 8mm;
+}
+
+@page page-nameplate {
+  size: 90mm 60mm;
+  margin: 0;
+}
+
+.print-sheet[data-size="A4"] {
+  page: page-a4;
+}
+.print-sheet[data-size="A4-landscape"] {
+  page: page-a4-landscape;
+}
+.print-sheet[data-size="A3-landscape"] {
+  page: page-a3-landscape;
+}
+.print-sheet[data-size="90x60mm"] {
+  page: page-nameplate;
+}
+
+@media print {
+  /* 只打印 #v5-print-root 的内容 */
+  body > *:not(#v5-print-root) {
+    display: none !important;
+  }
+
+  #v5-print-root {
+    display: block !important;
+    position: static !important;
+    background: #fff;
+    color: #000;
+    padding: 0;
+    margin: 0;
+  }
+
+  .print-sheet {
+    break-after: page;
+    break-inside: auto;
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    background: #fff;
+    font: 12px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif;
+  }
+
+  .print-sheet:last-child {
+    break-after: auto;
+  }
+
+  .print-sheet svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .doc-checklist input[type="text"] {
+    border-bottom: 0.5px solid #666;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}
