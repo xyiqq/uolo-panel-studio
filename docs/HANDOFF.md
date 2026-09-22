@@ -2,6 +2,8 @@
 
 更新：2026-09-22。用于新对话继续开发；先读本文，再读 [开发计划](DEVELOPMENT_PLAN.md)。
 
+本批交付PR：[PR #4](https://github.com/xyiqq/uolo-panel-studio/pull/4)。提交和合并状态以该链接为准。
+
 ## 项目与启动
 
 - 仓库：https://github.com/xyiqq/uolo-panel-studio ，默认分支main。
