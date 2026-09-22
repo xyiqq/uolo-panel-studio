@@ -8,6 +8,25 @@ import { computeBusBudgets } from '../../src/core/buses.js';
 const product = sku => CRESTRON_PRODUCTS.find(p => p.sku === sku);
 
 describe('Crestron official catalog integration', () => {
+  it.each([
+    ['DIN-8SW8-I', 5.4], ['DIN-1DIM4', 0.6], ['DIN-1DIMU4', 0.6],
+    ['DIN-4DIMFLV4', 4.2], ['DIN-2MC2', 3],
+  ])('%s separates control power from load mains', (sku, watts) => {
+    expect(product(sku)).toMatchObject({
+      powerInput: '24vdc', loadPowerInput: 'LN', busConsumption: { value: watts, unit: 'W' },
+    });
+  });
+
+  it('preserves the qualified NET consumption and DALI supply restrictions', () => {
+    for (const sku of ['DIN-1DIM4', 'DIN-1DIMU4']) {
+      expect(product(sku).busConsumption.condition).toContain('市电缺失');
+    }
+    expect(product('DIN-DLI')).toMatchObject({ powerInput: '24vdc-or-poe', loadPowerInput: null, daliPowerSupply: 'internal-only', busConsumption: { value: 6, unit: 'W' } });
+    expect(product('DIN-DALI-2')).toMatchObject({ powerInput: '24vdc-or-poe', loadPowerInput: null, daliPowerSupply: 'switchable', busConsumption: { value: 9, unit: 'W' } });
+    expect(product('DIN-PWS50')).toMatchObject({ powerInput: 'LN', loadPowerInput: null, daliPowerSupply: null });
+    expect(product('DIN-4DIMU4')).toMatchObject({ powerInput: 'LN', loadPowerInput: null });
+  });
+
   it.each(['DIN-1DIMU4', 'DIN-1DIM4'])('%s exposes all four outputs to module editing and terminal wiring', sku => {
     const p = product(sku);
     const mod = normalizeModule({ id: 'D1', productId: p.id, channels: { 1: 'C1' }, channelLabels: { 1: '原回路' }, channelTerminals: { 1: 'T1:1' } }, p);

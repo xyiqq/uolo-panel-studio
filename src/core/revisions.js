@@ -45,7 +45,7 @@ export function revisionLabel(design) {
  * 写入签认（就地修改）
  * @param {object} design
  * @param {"designer"|"reviewer"|"installer"} role
- * @param {{ name?: string, note?: string }} value
+ * @param {{ name?: string, at?: string, note?: string }} value
  * @param {string} [now]
  */
 export function setSignoff(design, role, value = {}, now) {
@@ -58,10 +58,28 @@ export function setSignoff(design, role, value = {}, now) {
   }
   design.signoff[role] = {
     name,
-    at: localStamp(now).slice(0, 10),
+    at: signoffDate(value.at, now),
     note: String(value.note || "").trim(),
   };
   return design.signoff;
+}
+
+function signoffDate(value, now) {
+  if (!value) return localStamp(now).slice(0, 10);
+  const date = String(value).trim();
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new RangeError('签认日期必须是有效的 YYYY-MM-DD 日期');
+  }
+  return date;
+}
+
+/** 同一次导出的所有文件共用的版本元信息。 */
+export function deliveryMetadata(design) {
+  const revisions = design?.revisions || [];
+  return { designId: design?.designId || '', name: design?.name || '', revision: revisionLabel(design),
+    at: revisions.at(-1)?.at || design?.updatedAt || design?.createdAt || '',
+    summary: revisions.at(-1)?.summary || '', signoff: structuredClone(design?.signoff || {}) };
 }
 
 /** 签认状态摘要文案 */

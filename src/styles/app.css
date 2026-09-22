@@ -10,7 +10,7 @@
 @media(max-width:1200px){.canvas-top{left:0;top:0;padding:18px 19px}.canvas-top h2{max-width:100%}}
 @media(max-width:650px){.canvas-top{left:0;top:0;padding:17px 15px;min-height:94px}.canvas-top h2{max-width:100%}.view-bottom{bottom:109px}.wire-legend{bottom:122px}.sim-label{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
-@media print{.shell,dialog,.toast{display:none!important}.print-only{display:block;font-size:10pt;color:#111}.print-only h1{font-size:20pt;margin-bottom:10pt}.print-only p{font-size:9pt;margin:10pt 0;line-height:1.6}.print-only table{width:100%;border-collapse:collapse;font-size:8pt}.print-only th,.print-only td{border:1px solid #bbc7b3;padding:5pt;text-align:left}.print-only img{max-height:330px;max-width:60%;display:block;margin:15pt auto}@page{size:A4 landscape;margin:13mm}}
+@media print{.shell,dialog,.toast{display:none!important}.print-only{display:block;font-size:10pt;color:#111}.print-only h1{font-size:20pt;margin-bottom:10pt}.print-only p{font-size:9pt;margin:10pt 0;line-height:1.6}.print-only table{width:100%;border-collapse:collapse;font-size:8pt}.print-only th,.print-only td{border:1px solid #bbc7b3;padding:5pt;text-align:left}.print-only img{max-height:330px;max-width:60%;display:block;margin:15pt auto}@page{size:A4 portrait;margin:0}}
 
 /* Inspection chrome stays separate from the circuit editor. */
 .topbar{background:#202825}.brand-mark{background:#33463b;border-color:#667f6c}.brand small{font-size:8px}
@@ -95,3 +95,5 @@
 .din-chip:hover{border-color:#168975;background:#eef6f1}
 .din-chip.active{border-color:#168975;background:#e2f3ea;box-shadow:inset 0 0 0 1px #16897555}
 .lib-preview{margin:12px 0 8px;padding:10px 12px;border-radius:8px;background:#1a2420;color:#c5d6cb;font-size:12px;line-height:1.6}
+
+#settings-address{box-sizing:border-box;width:100%;min-height:64px;padding:8px;border:1px solid #dfe5df;border-radius:4px;background:#fafcf9;font:inherit;font-size:11px;line-height:1.6;color:inherit;resize:vertical}

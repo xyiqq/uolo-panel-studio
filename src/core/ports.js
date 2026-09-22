@@ -1,6 +1,21 @@
 /**
  * 按 kind 生成端子模板（P1-2）。
  */
+export function dcInputVoltage(product) {
+  const input = String(product?.powerInput || '').replace(/\s/g, '');
+  const match = /^(?:(12|24)VDC|DC(12|24))(?:-or-poe)?$/i.exec(input);
+  return match ? Number(match[1] || match[2]) : null;
+}
+
+/** Load contacts remain separate from the controller's low-voltage supply. */
+export function loadPowerInput(product) {
+  return product?.loadPowerInput ?? product?.powerInput;
+}
+
+export function acceptsExternalDaliPower(product) {
+  return !['internal-only', 'switchable'].includes(product?.daliPowerSupply);
+}
+
 export function buildPortTemplates(product) {
   const kind = product?.kind;
   const ports = [];
@@ -29,6 +44,10 @@ export function buildPortTemplates(product) {
   }
 
   if (["relay", "dimmer", "contactor", "timer"].includes(kind)) {
+    if (dcInputVoltage(product)) {
+      add("DC+", "DC+", "top", "in");
+      add("DC-", "DC-", "top", "in");
+    }
     add("L_IN", "L", "top", "in");
     if(product.id !== 'crestron-din-8sw8-i') add("N_IN", "N", "top", "in");
     const ch = product.channels || 1;
@@ -57,7 +76,7 @@ export function buildPortTemplates(product) {
   }
 
   if (kind === "gateway") {
-    if (/24vdc|dc24/i.test(product.powerInput || '')) {
+    if (dcInputVoltage(product)) {
       add("DC+", "DC+", "top", "in");
       add("DC-", "DC-", "top", "in");
     }

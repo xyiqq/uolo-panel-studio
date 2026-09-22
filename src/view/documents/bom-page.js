@@ -1,43 +1,13 @@
-import { dash, esc, pageShell } from "./_util.js";
+import { esc, pageShell } from './_util.js';
+import {buildBomDelivery} from '../../core/bom-delivery.js';
 
-/** BOM 页 */
-export function renderBomPage({ bom } = {}) {
-  const items = bom?.items || [];
-  const wires = bom?.wires || [];
-
-  const itemRows = items
-    .map(
-      (it) =>
-        `<tr>` +
-        `<td>${esc(it.sku)}</td>` +
-        `<td>${esc(it.name)}</td>` +
-        `<td>${esc(it.brand || "")}</td>` +
-        `<td>${esc(it.qty)}</td>` +
-        `<td>${esc(it.note || "")}</td>` +
-        `</tr>`,
-    )
-    .join("");
-
-  const wireRows = wires
-    .map(
-      (w) =>
-        `<tr>` +
-        `<td>${esc(dash(w.section))}</td>` +
-        `<td>${esc(w.color)}</td>` +
-        `<td>${esc(w.meters)}</td>` +
-        `<td>${esc(w.note||'')}</td>` +
-        `</tr>`,
-    )
-    .join("");
-
-  const body =
-    `<section><h2>器件与附件</h2>` +
-    `<table class="doc-table"><thead><tr><th>SKU</th><th>名称</th><th>品牌</th><th>数量</th><th>备注</th></tr></thead>` +
-    `<tbody>${itemRows || "<tr><td colspan='5'>无</td></tr>"}</tbody></table></section>` +
-    `<section><h2>线材估算</h2>` +
-    `<table class="doc-table"><thead><tr><th>截面</th><th>颜色/线类</th><th>米数</th><th>估算范围</th></tr></thead>` +
-    `<tbody>${wireRows || "<tr><td colspan='4'>无</td></tr>"}</tbody></table>` +
-    `<p class="hint">线长按端子三维距离 ×1.4 +120 mm 余量估算；出箱电缆按回路长度计。仅供备料参考。</p></section>`;
-
-  return pageShell("物料清单 BOM", body, "doc-bom");
+/** Delivery BOM deliberately omits model catalog parameters. */
+export function renderBomPage({bom,assembly,design}={}) {
+  const view=buildBomDelivery(bom,{assembly,design});
+  const rows=items=>items.map(item=>`<tr><td>${esc(item.name)}</td><td>${esc(item.qty??'待核')}</td><td>${esc(item.unit)}</td><td>${esc(item.location)}</td></tr>`).join('')||'<tr><td colspan="4">无</td></tr>';
+  const table=(items,estimated=false)=>`<table class="doc-table"><thead><tr><th>通用名称</th><th>${estimated?'估算数量':'数量'}</th><th>单位</th><th>用途 / 位置${estimated?' / 待核事项':''}</th></tr></thead><tbody>${rows(items)}</tbody></table>`;
+  return pageShell('物料清单 BOM',
+    `<p class="hint">${esc(view.note)}</p>`+
+    `<section><h2>设备与附件 · 按布置统计</h2>${table(view.items)}</section>`+
+    `<section><h2>线材 · 估算待核</h2>${table(view.wires,true)}<p class="hint">线材按用途汇总，仅用于估算工作量。同类线材可能包含不同实际规格，采购前须另行拆分确认，不可直接据此下单。</p></section>`,'doc-bom');
 }

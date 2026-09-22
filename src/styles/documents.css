@@ -1,484 +1,74 @@
-/**
- * 文档中心：屏幕预览 + 打印分页样式
- * 口径：条件性方案 · 非施工合格结论
- *
- * 打印尺寸用具名页（named page）按页型切换：
- *   .page-A4 / .page-A4-landscape / .page-A3-landscape / .page-90x60mm
- */
-
-/* ---------- 预览容器 ---------- */
-
-.v5-docs-preview {
-  background: #f2f3f1;
-  color: #111;
-  padding: 16px;
-  border-radius: 4px;
-  min-height: 70vh;
-  overflow: auto;
-}
-
-.v5-doc-sheet {
-  background: #fff;
-  margin: 0 auto 20px;
-  padding: 12mm;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
-  box-sizing: border-box;
-  color: #111;
-  font: 12px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif;
-}
-
-.v5-doc-sheet[data-size="A4"] {
-  width: 210mm;
-  min-height: 297mm;
-}
-.v5-doc-sheet[data-size="A4-landscape"] {
-  width: 297mm;
-  min-height: 210mm;
-}
-.v5-doc-sheet[data-size="A3-landscape"] {
-  width: 420mm;
-  min-height: 297mm;
-}
-.v5-doc-sheet[data-size="90x60mm"] {
-  width: 120mm;
-  min-height: 80mm;
-  padding: 6mm;
-}
-
-/* 超宽页在屏幕上缩放以适配预览列 */
-.v5-docs-preview.fit-width .v5-doc-sheet {
-  transform-origin: top left;
-}
-
-.v5-doc-sheet svg {
-  max-width: 100%;
-  height: auto;
-}
-
-.v5-doc-caption {
-  font: 600 12px/1.4 "Microsoft YaHei", sans-serif;
-  color: #46584c;
-  margin: 0 auto 6px;
-  padding-left: 2px;
-}
-
-/* ---------- 页面通用 ---------- */
-
-.doc-page {
-  break-inside: auto;
-}
-
-.doc-head {
-  border-bottom: 1.5px solid #222;
-  padding-bottom: 6px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.doc-head h1 {
-  font-size: 16px;
-  margin: 0;
-  letter-spacing: 0.04em;
-}
-
-.doc-disclaimer {
-  margin: 0;
-  font-size: 10px;
-  color: #8a5a12;
-  border: 1px solid #d9b57a;
-  background: #fdf6e8;
-  padding: 1px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-.doc-body {
-  font-size: 11px;
-}
-
-.doc-body h2 {
-  font-size: 12.5px;
-  margin: 12px 0 6px;
-  padding-left: 6px;
-  border-left: 3px solid #3d6b52;
-}
-
-.doc-body .hint,
-.doc-body .muted {
-  font-size: 10px;
-  color: #666;
-  margin: 2px 0 6px;
-}
-
-/* ---------- 表格 ---------- */
-
-.doc-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 10px;
-  table-layout: auto;
-}
-
-.doc-table th,
-.doc-table td {
-  border: 0.5px solid #999;
-  padding: 3px 5px;
-  text-align: left;
-  vertical-align: top;
-  word-break: break-word;
-}
-
-.doc-table thead th {
-  background: #e8ece9;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.doc-table tbody tr:nth-child(even) td {
-  background: #fafbfa;
-}
-
-.doc-table thead {
-  display: table-header-group;
-}
-
-.doc-table tr {
-  break-inside: avoid;
-}
-
-/* ---------- 封面 ---------- */
-
-.doc-cover .doc-body {
-  padding-top: 24mm;
-}
-
-.cover {
-  text-align: left;
-}
-
-.cover-kicker {
-  font-size: 11px;
-  letter-spacing: 0.3em;
-  color: #5a6b60;
-  margin: 0 0 6px;
-}
-
-.cover-title {
-  font-size: 30px;
-  margin: 0 0 18px;
-  line-height: 1.25;
-}
-
-.cover-meta {
-  margin: 0 0 18px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 24px;
-}
-
-.cover-meta > div {
-  display: flex;
-  gap: 10px;
-  border-bottom: 0.5px dotted #aaa;
-  padding: 4px 0;
-}
-
-.cover-meta dt {
-  width: 56px;
-  color: #666;
-  font-size: 10px;
-  flex: none;
-}
-
-.cover-meta dd {
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.cover-qr {
-  margin: 12px 0;
-}
-
-.cover-note {
-  margin-top: 24px;
-  padding: 8px 10px;
-  border: 1px solid #d9b57a;
-  background: #fdf6e8;
-  font-size: 10.5px;
-  color: #6b4a10;
-}
-
-/* ---------- 面标 ---------- */
-
-.face-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2mm;
-  align-content: flex-start;
-}
-
-.face-label {
-  border: 0.4px dashed #888;
-  height: 12mm;
-  box-sizing: border-box;
-  padding: 1mm;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  overflow: hidden;
-  break-inside: avoid;
-}
-
-.face-cut {
-  display: none;
-}
-
-.face-id {
-  font-size: 8px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.face-name {
-  font-size: 6.5px;
-  color: #333;
-  line-height: 1.15;
-  word-break: break-all;
-}
-
-.pt-list {
-  font: 10px/1.5 Consolas, "Courier New", monospace;
-  background: #f5f6f5;
-  border: 0.5px solid #ccc;
-  padding: 6px 8px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-}
-
-/* ---------- 号码管 / 端子 / 挂牌 ---------- */
-
-.tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5mm;
-}
-
-.tag-list > * {
-  border: 0.4px solid #999;
-  padding: 0.8mm 1.5mm;
-  font-size: 8px;
-  break-inside: avoid;
-}
-
-.term-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1mm;
-  margin-bottom: 4mm;
-}
-
-.cable-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3mm;
-}
-
-.cable-tag {
-  border: 0.5px solid #666;
-  width: 52mm;
-  padding: 2mm;
-  font-size: 8.5px;
-  display: flex;
-  gap: 2mm;
-  align-items: center;
-  break-inside: avoid;
-}
-
-.cable-tag svg,
-.qr-cell svg {
-  flex: none;
-}
-
-.qr-cell {
-  text-align: center;
-}
-
-/* ---------- 铭牌 ---------- */
-
-.doc-nameplate {
-  width: 90mm;
-  height: 60mm;
-  box-sizing: border-box;
-}
-
-.nameplate {
-  border: 0.8px solid #222;
-  padding: 3mm;
-  height: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5mm;
-  position: relative;
-}
-
-.np-brand {
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: #555;
-}
-
-.np-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.np-meta {
-  font-size: 8.5px;
-  color: #333;
-  line-height: 1.6;
-}
-
-.np-qr {
-  position: absolute;
-  right: 3mm;
-  bottom: 3mm;
-}
-
-.np-disclaimer {
-  margin-top: auto;
-  font-size: 7px;
-  color: #8a5a12;
-}
-
-/* ---------- 检查单（可交互） ---------- */
-
-.check-sec {
-  break-inside: avoid;
-  margin-bottom: 8px;
-}
-
-.doc-checklist .doc-table td:first-child,
-.doc-checklist .doc-table th:first-child {
-  width: 22px;
-  text-align: center;
-}
-
-.doc-checklist input[type="checkbox"] {
-  width: 12px;
-  height: 12px;
-}
-
-.doc-checklist input[type="text"] {
-  width: 100%;
-  border: none;
-  border-bottom: 0.5px solid #bbb;
-  font: inherit;
-  background: transparent;
-  padding: 0 2px;
-}
-
-/* ---------- 系统图交互 ---------- */
-
-.v5-doc-sheet svg [data-circuit] {
-  cursor: pointer;
-}
-
-.v5-doc-sheet svg [data-circuit]:hover {
-  outline: none;
-}
-
-.v5-doc-sheet svg [data-circuit]:hover rect:first-of-type {
-  fill: #eef6f1;
-}
-
-/* ---------- 打印 ---------- */
-
-@page {
-  size: A4 portrait;
-  margin: 10mm;
-}
-
-@page page-a4 {
-  size: A4 portrait;
-  margin: 10mm;
-}
-
-@page page-a4-landscape {
-  size: A4 landscape;
-  margin: 8mm;
-}
-
-@page page-a3-landscape {
-  size: A3 landscape;
-  margin: 8mm;
-}
-
-@page page-nameplate {
-  size: 90mm 60mm;
-  margin: 0;
-}
-
-.print-sheet[data-size="A4"] {
-  page: page-a4;
-}
-.print-sheet[data-size="A4-landscape"] {
-  page: page-a4-landscape;
-}
-.print-sheet[data-size="A3-landscape"] {
-  page: page-a3-landscape;
-}
-.print-sheet[data-size="90x60mm"] {
-  page: page-nameplate;
-}
-
-@media print {
-  /* 只打印 #v5-print-root 的内容 */
-  body > *:not(#v5-print-root) {
-    display: none !important;
-  }
-
-  #v5-print-root {
-    display: block !important;
-    position: static !important;
-    background: #fff;
-    color: #000;
-    padding: 0;
-    margin: 0;
-  }
-
-  .print-sheet {
-    break-after: page;
-    break-inside: auto;
-    width: auto;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
-    background: #fff;
-    font: 12px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif;
-  }
-
-  .print-sheet:last-child {
-    break-after: auto;
-  }
-
-  .print-sheet svg {
-    width: 100%;
-    height: auto;
-  }
-
-  .doc-checklist input[type="text"] {
-    border-bottom: 0.5px solid #666;
-  }
-
-  a {
-    text-decoration: none;
-    color: inherit;
-  }
+/* A4 portrait document system. Screen and print share the same physical page geometry. */
+.v5-docs-preview{background:#e7ece9;color:#20362e;padding:16px;border-radius:8px;min-height:70vh;overflow:auto}
+#v5-docs-panel{color:#d9e7df}
+.v5-doc-sheet,.print-sheet{width:210mm;height:297mm;box-sizing:border-box;padding:12mm;background:white;color:#23372f;font:13px/1.55 "Microsoft YaHei","PingFang SC",Arial,sans-serif;overflow:visible}
+.v5-doc-sheet{margin:0 auto 22px;box-shadow:0 3px 15px #0002;border:0}
+.v5-doc-sheet[data-size="A4-labels"],.print-sheet[data-size="A4-labels"]{padding:0}
+.v5-doc-caption{font:600 13px/1.5 "Microsoft YaHei",sans-serif;color:#405d50;margin:0 0 8px}
+.v5-doc-sheet svg{max-width:100%;height:auto;display:block}
+.doc-page{box-sizing:border-box;margin:0;color:#23372f}
+.doc-page--paged{height:273mm;display:flex;flex-direction:column}
+.doc-head{flex:none;border-top:3px solid #23765c;border-bottom:1px solid #cedbd3;padding:12px 0 10px;margin:0 0 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.doc-head h1{font-size:23px;line-height:1.3;margin:0;color:#163f31;letter-spacing:.02em}
+.doc-disclaimer{font-size:10px;line-height:1.5;max-width:140px;margin:0;color:#657369;text-align:right}
+.doc-guide{padding:10px 12px;border-left:3px solid #4c9675;background:#f0f6f2;color:#41604e;font-size:12px;line-height:1.65;margin:0 0 14px;flex:none}
+.doc-body{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.doc-page--paged>.doc-body{flex:1;min-height:0}
+.doc-body>section{margin:0 0 16px}
+.doc-body h2{font-size:15px;color:#245941;border-left:3px solid #45916c;padding-left:9px;margin:14px 0 8px;break-after:avoid}
+.doc-body h3{font-size:13px;margin:12px 0 6px;color:#42644f;break-after:avoid}
+.doc-body p{margin:4px 0 10px}
+.doc-body .hint,.doc-body .muted{font-size:11px;line-height:1.6;color:#637469}
+.doc-empty{padding:24px;border:1px dashed #c4d2c9;border-radius:6px;text-align:center;background:#f8faf8;color:#607267}
+.doc-version{display:flex;justify-content:space-between;gap:12px;flex:none;border-top:1px solid #d3ded7;margin-top:12px;padding-top:8px;font-size:10px;color:#64756a;min-height:18px;overflow-wrap:anywhere}
+.doc-page-number{white-space:nowrap;flex:none}
+.doc-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;line-height:1.65}
+.doc-table th,.doc-table td{border:1px solid #d6e0da;padding:7px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere;word-break:normal}
+.doc-table thead th{background:#eaf2ed;color:#28583f;font-weight:600;white-space:normal}
+.doc-table tbody tr:nth-child(even) td{background:#f7faf8}
+.doc-table thead{display:table-header-group}
+.doc-table tr{break-inside:avoid}
+.doc-table small{font-size:11px;color:#64776b;display:block;margin-top:3px}
+.doc-table td strong{font-weight:600;color:#224a35}
+.doc-bom .doc-table th:nth-child(1){width:24%}.doc-bom .doc-table th:nth-child(2){width:12%}.doc-bom .doc-table th:nth-child(3){width:8%}.doc-bom .doc-table th:nth-child(4){width:56%}
+.doc-cover .doc-body{padding-top:8mm}
+.cover-kicker{font-size:12px;letter-spacing:.14em;color:#6b8071;margin:0 0 10px}
+.doc-body .cover-title{font-size:30px;line-height:1.45;border:0;padding:0;color:#184e35;margin:0 0 24px;overflow-wrap:anywhere}
+.cover-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin:0 0 20px}
+.cover-meta>div{border-bottom:1px solid #dce5df;padding-bottom:8px;min-width:0}
+.cover-meta>.cover-project-info{grid-column:1/-1}.cover-project-info dd{white-space:pre-wrap}
+.cover-meta dt{font-size:11px;color:#708274;margin-bottom:3px}.cover-meta dd{font-size:13px;font-weight:600;margin:0;overflow-wrap:anywhere}
+.cover-note{padding:12px;background:#f7f3e9;border-left:3px solid #b99a55;color:#776037;font-size:12px}
+.cover-reading{padding:12px 16px;background:#f2f7f3;border:1px solid #d9e5dc;border-radius:6px}
+.cover-qr{margin:14px 0}.cover-qr svg{width:30mm;height:30mm}
+.face-grid{display:flex;flex-wrap:wrap;gap:2mm;align-content:flex-start}
+.face-label{box-sizing:border-box;min-height:12mm;border:1px dashed #9eada2;padding:1mm;display:flex;flex-direction:column;justify-content:center;break-inside:avoid;overflow-wrap:anywhere}
+.face-id{font-size:10px;font-weight:700;line-height:1.3}.face-name{font-size:9px;line-height:1.4;color:#3b4f42}.face-cut{display:none}
+.pt-list{font:11px/1.6 Consolas,"Microsoft YaHei",monospace;background:#f5f8f6;border:1px solid #d5e0d8;padding:10px;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.tag-list,.term-strip{display:flex;flex-wrap:wrap;gap:6px;padding:0;margin:6px 0 12px;list-style:none}
+.tag-list>li,.term-strip>li{border:1px solid #cbd8ce;background:#fafcf9;padding:6px 8px;font-size:11px;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;break-inside:avoid}
+.tag-list code,.term-strip code{font:inherit;color:#254e39}
+.cable-grid{display:flex;flex-wrap:wrap;gap:4mm}
+.cable-tag{width:88mm;box-sizing:border-box;border:1px dashed #96ae9d;padding:3mm;font-size:12px;line-height:1.7;break-inside:avoid;overflow-wrap:anywhere}
+.cable-tag .qr-cell{margin-top:8px}.qr-cell{text-align:center}.qr-cell svg{width:30mm;height:30mm;margin:0 auto;max-width:none}
+.doc-nameplate{width:auto}.nameplate{width:90mm;height:60mm;box-sizing:border-box;border:1px dashed #809784;padding:4mm;position:relative;display:flex;flex-direction:column;gap:2mm;background:#fff}
+.np-brand{font-size:10px;letter-spacing:.12em;color:#748578}.np-title{font-size:17px;font-weight:700;line-height:1.4;overflow-wrap:anywhere}.np-meta{font-size:11px;line-height:1.5;overflow-wrap:anywhere}.np-disclaimer{font-size:10px;color:#7b704f;margin-top:auto}.np-qr{margin-top:5mm}.np-qr svg{width:32mm;height:32mm}
+.check-sec{margin-bottom:14px}.doc-checklist .doc-table th:first-child,.doc-checklist .doc-table td:first-child{width:28px;text-align:center}
+.doc-checklist input[type=checkbox]{width:15px;height:15px}.doc-checklist input[type=text]{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid #91a895;background:none;padding:2px;font:inherit;color:inherit}
+.doc-checklist td{position:relative}.doc-checklist .check-mirror{visibility:hidden}.doc-checklist input[type=text]{position:absolute;left:8px;top:7px;width:calc(100% - 16px)}.doc-checklist input[type=checkbox]{position:absolute;left:50%;top:8px;transform:translateX(-50%);margin:0}
+.doc-check-status{font-size:17px;color:#276246}.smart-face-card{margin:0 0 16px;border:1px solid #d3dfd6;padding:10px;break-inside:avoid}.smart-face-card svg{width:100%;max-height:78mm}.smart-face-card figcaption{font-size:12px;line-height:1.6;margin-top:8px}
+.doc-svg .doc-body{display:flex;align-items:flex-start;justify-content:center}.doc-svg .doc-body>svg{width:100%;max-height:260mm}
+.cabinet-image-card{margin:0;break-inside:avoid}.cabinet-image-frame{width:100%;height:180mm;box-sizing:border-box;border:1px solid #d6e0da;background:#f7faf8;padding:3mm;display:flex;align-items:center;justify-content:center}.cabinet-image-frame--photo{background:#fff}.cabinet-image-frame img{display:block;width:100%;height:100%;object-fit:contain}.cabinet-image-card figcaption{font-size:12px;line-height:1.6;color:#526b5b;margin-top:10px;overflow-wrap:anywhere}
+.v5-label-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}.v5-dialog fieldset{margin:12px 0;border:1px solid #314239;border-radius:6px}.v5-dialog [role=alert]{color:#ffb3a5}.v5-dialog button:disabled{opacity:.4;cursor:not-allowed}
+.doc-labels-sheet--paper{padding:0;border:0;height:297mm}
+@page studio-a4{size:210mm 297mm;margin:0}
+.print-sheet{page:studio-a4}
+@media(max-width:700px){#v5-docs-panel .v5-docs-layout{grid-template-columns:1fr}#v5-docs-panel .v5-docs-nav{position:static}}
+@media print{
+ html,body{margin:0!important;padding:0!important;background:#fff!important;height:auto!important;overflow:visible!important}
+ body>*:not(#v5-print-root){display:none!important}
+ #v5-print-root{display:block!important;position:static!important;margin:0!important;padding:0!important;background:white;color:#23372f}
+ .print-sheet{page:studio-a4!important;width:210mm!important;height:297mm!important;margin:0!important;padding:12mm;box-shadow:none;border:0;break-after:page;break-inside:avoid;font:13px/1.55 "Microsoft YaHei","PingFang SC",Arial,sans-serif;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .print-sheet[data-size="A4-labels"]{padding:0}.print-sheet:last-child{break-after:auto}.screen-only{display:none!important}
+ .print-sheet svg{max-width:100%;height:auto}.doc-checklist input[type=text]{border-bottom:0}a{color:inherit;text-decoration:none}
 }

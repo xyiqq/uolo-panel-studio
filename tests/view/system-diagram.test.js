@@ -38,10 +38,47 @@ describe("system-diagram · 系统图", () => {
     }
   });
 
-  it("16 列分页行为不变，母排带相色与线型兜底", () => {
-    expect(pages.length).toBe(Math.ceil(design.circuits.length / 16));
-    expect(pages[0]).toContain('stroke-dasharray="3.5 1.6"'); // L2
-    expect(pages[0]).toContain('stroke-dasharray="1.4 1.4"'); // L3
-    expect(pages[0]).toContain("#429cdd"); // N
+  it("A4 纵向按可读字号分页，每页最多四个回路且没有丢失回路", () => {
+    expect(pages.length).toBeGreaterThanOrEqual(Math.ceil(design.circuits.length / 4));
+    const joined = pages.join('');
+    for (const circuit of design.circuits) expect(joined).toContain(`data-circuit="${circuit.id}"`);
+    for (const page of pages) {
+      expect(page).toContain('viewBox="0 0 210 270"');
+      expect((page.match(/data-circuit=/g) || []).length).toBeLessThanOrEqual(4);
+      if (page.includes('data-circuit=')) expect(page).toContain('怎么看');
+      expect(page).toContain('font-size="3.5"');
+    }
+    expect(joined).toContain('stroke-dasharray="3.5 1.6"'); // L2
+    expect(joined).toContain('stroke-dasharray="1.4 1.4"'); // L3
+    expect(joined).toContain("#429cdd"); // N
+  });
+
+  it('超长模块信息分段分页，最后的内容仍保留且卡片不超过页底', () => {
+    const longDesign = {circuits:[{id:'C1', name:'测试回路', path:'很长的安装路径'.repeat(200) + '最终标记'}]};
+    const result = renderSystemDiagram(longDesign,{nodes:[]},{}).pages;
+    expect(result.length).toBeGreaterThan(1);
+    expect(result.join('').replace(/<[^>]*>/g,'')).toContain('最终标记');
+    for (const page of result) {
+      for (const match of page.matchAll(/<rect x="(?:10|108)" y="([\d.]+)" width="92" height="([\d.]+)"/g)) {
+        expect(Number(match[1]) + Number(match[2])).toBeLessThanOrEqual(253);
+      }
+    }
+  });
+
+  it('保留实际上下游与断开状态，未生成接线时不猜测来源', () => {
+    const design = {circuits:[{id:'C1',name:'照明'}]};
+    const net = {wires:[
+      {from:'SERVICE:L1',to:'Q0:L1_IN',conductor:'L1',connected:true,scope:'入户电缆'},
+      {from:'BUS:L1-C1',to:'C1:L1_IN',circuit:'C1',conductor:'L1',connected:false},
+      {from:'C1:L1_OUT',to:'X-C1:L1',circuit:'C1',conductor:'L1',connected:true},
+      {from:'PE:PE-C1',to:'X-C1:PE',circuit:'C1',conductor:'PE',connected:true},
+    ]};
+    const joined = renderSystemDiagram(design,{nodes:[]},net).pages.join('').replace(/<[^>]*>/g,'');
+    expect(joined).toContain('BUS:L1-C1 → C1:L1_IN（断开）');
+    expect(joined).toContain('C1:L1_OUT → X-C1:L1');
+    expect(joined).toContain('SERVICE:L1');
+    expect(joined).toContain('Q0:L1_IN');
+    expect(joined).toContain('非标准电气原理图');
+    expect(renderSystemDiagram(design,{nodes:[]},{}).pages.join('')).toContain('未生成接线');
   });
 });

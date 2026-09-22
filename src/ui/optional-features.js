@@ -34,7 +34,7 @@ export function mountOptionalFeatures({root,getDesign,getAssembly,getNet,product
   const showBuses=()=>{
     const budgets=computeBusBudgets(getDesign(),products());
     const fmt=v=>v==null?'待核':Number(v.toFixed(2));
-    open('总线编辑',`<p>编辑电源、成员和线缆参数。未录入的消耗保持待核，多电源不会自动并联。</p><button class="btn primary" data-bus-new>新增总线</button><div class="feature-bus-list">${budgets.map(b=>`<article><strong>${esc(b.label||b.id)}</strong><p>${esc(b.type.toUpperCase())} · ${b.deviceCount} 个成员 · ${fmt(b.used)} / ${fmt(b.capacity)} ${esc(b.unit)}</p><small>${esc(b.pending.join('；'))}</small><div><button class="btn" data-bus-edit="${esc(b.id)}">编辑</button><button class="btn danger" data-bus-delete="${esc(b.id)}">删除</button></div></article>`).join('')||'<p>暂无总线。先从器件库装入电源和模块，再配置关联。</p>'}</div>`);
+    open('总线编辑',`<p>编辑电源、成员和线缆参数。未录入的消耗保持待核，多电源不会自动并联。</p><button class="btn primary" data-bus-new>新增总线</button><div class="feature-bus-list">${budgets.map(b=>`<article><strong>${esc(b.label||b.id)}</strong><p>${esc(b.type.toUpperCase())} · ${b.deviceCount} 个成员 · ${b.usedKnown?fmt(b.used):b.knownUsed>0?`至少 ${fmt(b.knownUsed)}（部分待核）`:'待核'} / ${fmt(b.capacity)} ${esc(b.unit)}</p><small>${esc(b.pending.join('；'))}</small><div><button class="btn" data-bus-edit="${esc(b.id)}">编辑</button><button class="btn danger" data-bus-delete="${esc(b.id)}">删除</button></div></article>`).join('')||'<p>暂无总线。先从器件库装入电源和模块，再配置关联。</p>'}</div>`);
     modal().querySelector('[data-bus-new]').onclick=()=>showBusForm();
     modal().querySelectorAll('[data-bus-edit]').forEach(el=>el.onclick=()=>showBusForm(el.dataset.busEdit));
     modal().querySelectorAll('[data-bus-delete]').forEach(el=>el.onclick=()=>{
@@ -60,6 +60,10 @@ export function mountOptionalFeatures({root,getDesign,getAssembly,getNet,product
       modal().querySelector('#bus-segregation').value=type==='dali'?'FELV':['dc','knx','cresnet','qslink'].includes(type)?'SELV':'none';
       modal().querySelector('#bus-limit').value=['dali','knx'].includes(type)?64:'';
     };
+    modal().querySelector('#bus-unit').onchange=()=>{
+      // 手动改单位同样不能把已输入的容量数值直接解释为另一单位。
+      modal().querySelector('#bus-capacity').value='';
+    };
     modal().querySelector('[data-bus-cancel]').onclick=showBuses;
     modal().querySelector('[data-bus-save]').onclick=()=>{
       const value=id=>modal().querySelector('#'+id).value;
@@ -70,7 +74,8 @@ export function mountOptionalFeatures({root,getDesign,getAssembly,getNet,product
   };
   const showRows=()=>{
     const a=getAssembly(),d=getDesign(),issues=rowZoneIssues(d,a);
-    open('强弱电分排',`<p>按器件目录分区约束自动排布。控制模块仍可能含市电端子，分排不代替电气隔离核验。</p><div class="feature-rows">${Array.from({length:a.box.rows},(_,row)=>field(`第 ${row+1} 排 · ${a.nodes.filter(n=>!n.overflow&&n.row===row).length} 个器件`,`<select data-row-zone="${row}">${options(ROW_ZONES,rowZone(d,row))}</select>`)).join('')}</div><p>${issues.map(i=>esc(i.message)).join('<br>')}</p><p>保存时保留兼容的手动位置，不兼容位置会尝试重新排布并提示。选择“全部自动重排”会释放所有手动位置，可撤销。</p><label class="switch-label"><input type="checkbox" id="row-release">全部自动重排</label><p class="feature-error" role="alert"></p><div class="tools"><button class="btn" data-feature-done>取消</button><button class="btn primary" data-row-save>保存分排</button></div>`);
+    open('强弱电分排',`<p>按器件目录分区约束自动排布。控制模块仍可能含市电端子，分排不代替电气隔离核验。</p><div class="feature-rows">${Array.from({length:a.box.rows},(_,row)=>field(`第 ${row+1} 排 · ${a.nodes.filter(n=>!n.overflow&&n.row===row).length} 个器件`,`<select data-row-zone="${row}">${options(ROW_ZONES,rowZone(d,row))}</select>`)).join('')}</div><div class="feature-issues">${issues.map(i=>`<article class="feature-issue error"><span>${esc(i.message)}</span><button class="link" data-row-issue="${esc(i.ref)}">定位 ${esc(i.ref)}</button></article>`).join('')}</div><p>保存时保留兼容的手动位置，不兼容位置会尝试重新排布并提示。选择“全部自动重排”会释放所有手动位置，可撤销。</p><label class="switch-label"><input type="checkbox" id="row-release">全部自动重排</label><p class="feature-error" role="alert"></p><div class="tools"><button class="btn" data-feature-done>取消</button><button class="btn primary" data-row-save>保存分排</button></div>`);
+    modal().querySelectorAll('[data-row-issue]').forEach(el=>el.onclick=()=>{close();select(el.dataset.rowIssue);});
     modal().querySelector('[data-feature-done]').onclick=close;
     modal().querySelector('[data-row-save]').onclick=()=>{
       const zones=[...modal().querySelectorAll('[data-row-zone]')].map(el=>el.value),release=modal().querySelector('#row-release').checked;

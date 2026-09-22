@@ -7,6 +7,33 @@ import {terminalLabelLayout} from './terminal-label-layout.js';
 import {nodeExplosionOffset, connectionInspection, wireTouchesSelection} from './exploded-wiring.js';
 
 export class TerminalStudio3D extends Studio3D {
+  /** Full cabinet export, independent of viewport size, selection and exploded inspection. */
+  screenshot() { return this.captureDocumentImage({mimeType:'image/png'}); }
+  captureDocumentImage({mimeType='image/jpeg'}={}) {
+    if(!this.model||this.contextLost)return null;
+    const renderer=this.renderer,size=renderer.getSize(new THREE.Vector2()),ratio=renderer.getPixelRatio();
+    const saved={options:this.options,selected:this.selected,hovered:this.hovered,explosion:this.explosion,explosionTarget:this.explosionTarget,background:this.scene.background,floor:this.floor.visible};
+    try {
+      this.options={...this.options,isolate:false,exploded:false,explodeScope:'all',door:false,wireMode:'all',selected:null,sim:{...this.options.sim,power:false}};
+      this.selected=null;this.hovered=null;this.explosion=0;this.explosionTarget=0;
+      this.applyPose(0);this.updateVisibility();this.updateHighlight();this.floor.visible=false;
+      this.scene.background=new THREE.Color('#f4f6f4');
+      const bounds=this.bounds(false,false),center=bounds.getCenter(new THREE.Vector3());
+      const extent=bounds.getSize(new THREE.Vector3()),aspect=1200/1500;
+      const halfHeight=Math.max(extent.y,extent.x/aspect)*.56,halfWidth=halfHeight*aspect;
+      const distance=Math.max(extent.x,extent.y,extent.z)+1;
+      const camera=new THREE.OrthographicCamera(-halfWidth,halfWidth,halfHeight,-halfHeight,.1,distance*4);
+      camera.position.set(center.x,center.y,center.z+distance);camera.lookAt(center);
+      camera.updateProjectionMatrix();camera.updateMatrixWorld();
+      renderer.setPixelRatio(1);renderer.setSize(1200,1500,false);renderer.shadowMap.needsUpdate=true;
+      renderer.render(this.scene,camera);
+      return renderer.domElement.toDataURL(mimeType,.9);
+    } finally {
+      this.options=saved.options;this.selected=saved.selected;this.hovered=saved.hovered;this.explosion=saved.explosion;this.explosionTarget=saved.explosionTarget;
+      this.scene.background=saved.background;this.applyPose(saved.explosion);this.updateVisibility();this.updateHighlight();this.floor.visible=saved.floor;
+      renderer.setPixelRatio(ratio);renderer.setSize(size.x,size.y,false);this.shadowDirty=true;this.dirty=true;
+    }
+  }
   signature(net) {
     return super.signature(net) + JSON.stringify([net.nodes.filter(n=>n.id==='N').map(n=>[n.x,n.y,n.barOrient]),net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || ''])]);
   }
@@ -87,12 +114,15 @@ export class TerminalStudio3D extends Studio3D {
     }
     this.model.layers.wires.visible=this.options.wireMode!=='none';
     for(const ref of this.model.wires.values()) {
+      const hiddenSupply=[ref.edge.from,ref.edge.to].some(id=>this.net.nodes.find(n=>n.id===this.net.ports[id]?.node)?.role==='service');
       const direct=this.inspection?.wireIds.has(ref.edge.id)??wireTouchesSelection(this.net,ref.edge,this.selected);
       const replaced=this.segments?.some(s=>s.replacedWireId===ref.edge.id);
-      const visible=!replaced&&this.options.wireMode!=='none'&&(isolate?direct:this.options.wireMode==='all'||direct||ref.mesh.visible);
+      const visible=!hiddenSupply&&!replaced&&this.options.wireMode!=='none'&&(isolate?direct:this.options.wireMode==='all'||direct||ref.mesh.visible);
       ref.mesh.visible=visible;
       if(ref.stripe) ref.stripe.visible=visible&&ref.edge.connected;
     }
+    this.activePulses=this.activePulses.filter(ref=>ref.mesh.visible);
+    this.pulses.forEach((pulse,index)=>pulse.visible=index<this.activePulses.length);
     if(isolate||this.explosionTarget||this.explosion) {
       this.activePulses=[];this.pulses.forEach(p=>p.visible=false);
     }

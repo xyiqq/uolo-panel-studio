@@ -6,6 +6,16 @@ import {findProduct,validateDesign,buildAssembly} from '../../src/core/domain.js
 import {normalizeModule,validateHardwareId,validateIpAddress,isNetworkModule,moduleAddressMode,visibleModuleAddress,setModuleAddressMode} from '../../src/core/modules.js';
 import {terminalRows,saveTerminalRows,terminalWireSegments,terminalCsv} from '../../src/core/terminal-connections.js';
 import {terminalConnectionSvg} from '../../src/view/terminal-connections.js';
+
+it('端子交付纵向版支持六条连接，保留横向装配预览', () => {
+ const rows=Array.from({length:6},(_,i)=>({terminalId:'T1',pole:i+1,loadName:`房间${i+1}`,output:`K1:CH${i+1}_OUT`,section:1.5}));
+ const portrait=terminalConnectionSvg(rows,{orientation:'portrait'});
+ expect(portrait).toContain('viewBox="0 0 600 800"');
+ expect(portrait.match(/data-terminal=/g)).toHaveLength(6);
+ expect(portrait).toContain('尚未填写');
+ expect(portrait).toContain('K1:CH6_OUT');
+ expect(terminalConnectionSvg(rows)).toContain('viewBox="0 0 800 ');
+});
 import {buildPortTemplates} from '../../src/core/ports.js';
 import {moduleFaceSvg} from '../../src/view/module-face.js';
 import {moduleFaceScene} from '../../src/view/module-face.js';

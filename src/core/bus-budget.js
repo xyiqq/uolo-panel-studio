@@ -36,7 +36,8 @@ export function computeBusBudgets(design, products = []) {
       if(v==null)pending.push(`${id} 消耗未知或单位无法换算`);
       return v;
     });
-    const usedKnown=usage.every(v=>v!==null),used=usedKnown?usage.reduce((a,b)=>a+b,0):null;
+    const knownUsed=usage.reduce((sum,v)=>sum+(v??0),0);
+    const usedKnown=usage.every(v=>v!==null),used=usedKnown?knownUsed:null;
     if(bus.type==='dali' && capacity!=null) {
       const limit=convertBudget(250,'mA',unit,busVoltage);
       if(limit!=null)capacity=Math.min(capacity,limit);
@@ -44,8 +45,8 @@ export function computeBusBudgets(design, products = []) {
     }
     const maxDevices=bus.maxDevices??(['knx','dali'].includes(bus.type)?64:null);
     return {id:bus.id,busId:bus.id,type:bus.type,label:bus.label,unit,capacity,used,capacityKnown:capacity!=null,usedKnown,
-      knownUsed:usage.reduce((sum,v)=>sum+(v??0),0),pending,maxDevices,deviceCount:members.length,hasPsu:sources.length>0,psuCount:sources.length,
-      overBudget:capacity!=null&&used!=null&&used>capacity,overDevices:maxDevices!=null&&members.length>maxDevices,
+      knownUsed,pending,maxDevices,deviceCount:members.length,hasPsu:sources.length>0,psuCount:sources.length,
+      overBudget:capacity!=null&&knownUsed>capacity,overDevices:maxDevices!=null&&members.length>maxDevices,
       utilization:capacity>0&&used!=null?used/capacity:null};
   });
 }

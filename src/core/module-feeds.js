@@ -1,6 +1,8 @@
+import {loadPowerInput} from './ports.js';
+
 /** Derived wiring: saved module/circuit assignments are never changed here. */
 export function isMainsFedModule(product) {
-  return product?.kind !== 'terminal' && (product?.powerInput === 'LN'
+  return product?.kind !== 'terminal' && (loadPowerInput(product) === 'LN'
     || ['relay', 'dimmer', 'contactor', 'timer'].includes(product?.kind));
 }
 
@@ -72,7 +74,7 @@ export function applyModuleFeeds(net, design) {
         if(loadNeutral) neutralLoads.set(loadNeutral.id,{...loadNeutral,moduleNeutral:true,moduleId:binding.moduleId,breakerId:binding.breakerId});
         continue;
       }
-      if (conductor === 'N' && (node.product.powerInput !== 'LN'
+      if (conductor === 'N' && (loadPowerInput(node.product) !== 'LN'
         || node.product.id === 'crestron-din-8sw8-i')) continue;
       const template = net.wires.find(w => w.to === `X-${binding.breakerId}:${conductor}`);
       if (!template) continue;
@@ -89,7 +91,9 @@ export function applyModuleFeeds(net, design) {
       additions.push({...internalTemplate, id, from: from.id, to: target.id, class: 'power', lengthKind: 'internal',
         section: design.wireOverrides?.[id] ?? template.section,
         connected: template.connected && !design.disconnected?.includes(id),
-        scope: conductor === 'N' ? '空开 → 模块零线' : '空开 → 模块火线',
+        scope: node.product.loadPowerInput === 'LN'
+          ? conductor === 'N' ? '空开 → 负载零线' : '空开 → 负载供电'
+          : conductor === 'N' ? '空开 → 模块零线' : '空开 → 模块火线',
         moduleFeed: true, moduleId: binding.moduleId, breakerId: binding.breakerId});
       removed.add(template.id);
       // X represents the existing circuit supply status, not a switched output.

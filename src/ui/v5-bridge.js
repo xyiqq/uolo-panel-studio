@@ -10,7 +10,7 @@ import { computeSpace } from "../core/space.js";
 import { buildDocumentPack } from "../view/documents/index.js";
 import { buildBom } from "../core/bom.js";
 import {buildDeliveryNet} from '../core/delivery-net.js';
-import { applyLabelRules } from "../core/labels.js";
+import { applyLabelRules, normalizeLabelSheet } from "../core/labels.js";
 import { buildHandoverZip } from "../core/pack.js";
 import { buildHandoverFiles } from "../core/handover.js";
 import { buildPtouchRows, ptouchCsv, renderFaceLabelsSvg } from "../view/documents/ptouch.js";
@@ -26,6 +26,9 @@ import {
 import { matchCircuit } from "../core/domain.js";
 import { zipSync, strToU8 } from "fflate";
 import "../styles/documents.css";
+import documentCss from "../styles/documents.css?raw";
+import {projectQrUrl} from '../view/qr.js';
+import {paginateDocumentPages} from '../view/documents/paginate.js';
 
 const DISCLAIMER = "条件性方案 · 非施工合格结论";
 
@@ -72,9 +75,10 @@ export function mountV5Bridge(api) {
   exposeSmartProducts();
   // 供 app.js 导出对话框调用
   window.__V5_DOCS__ = {
+    prepare: action => prepareDelivery(api, action),
     open: () => openDocs(api),
-    zip: () => downloadZip(api),
-    print: () => doPrint(api),
+    zip: () => prepareDelivery(api, () => downloadZip(api)),
+    print: () => prepareDelivery(api, () => doPrint(api)),
   };
   if (docState.open) renderDocs(api);
 }
@@ -202,7 +206,7 @@ function injectSpacePanel(api) {
     <div class="row"><span>需排数(含备用)</span><b id="v5-rows">—</b></div>
     <div class="row"><span>宽度待核</span><b id="v5-unk">—</b></div>
     <label>备用比例 <span id="v5-spare-val">25%</span>
-      <input id="v5-spare" type="range" min="0" max="50" step="5" value="25">
+      <input id="v5-spare" type="range" min="0" max="50" step="5" value="${Math.round((api.getDesign().spareRatio ?? .25)*100)}">
     </label>
     <div class="tiny" id="v5-space-msg" style="margin-top:6px;opacity:.85"></div>
     <div class="v5-rec" id="v5-rec"></div>
@@ -215,8 +219,8 @@ function injectSpacePanel(api) {
       const design = api.getDesign();
       const assembly = api.getAssembly();
       if (!design || !assembly) return;
-      design.spareRatio = Number($("#v5-spare").value) / 100;
-      $("#v5-spare-val").textContent = Math.round(design.spareRatio * 100) + "%";
+      $("#v5-spare").value = Math.round((design.spareRatio ?? .25) * 100);
+      $("#v5-spare-val").textContent = $("#v5-spare").value + "%";
       const cabinets = allCabinets(design);
       const space = computeSpace(design, assembly, cabinets);
       $("#v5-m-power").textContent = String(space.modulesPower);
@@ -252,7 +256,11 @@ function injectSpacePanel(api) {
     }
   };
 
-  $("#v5-spare")?.addEventListener("input", refresh);
+  $("#v5-spare")?.addEventListener("input", () => {
+    api.getDesign().spareRatio = Number($("#v5-spare").value) / 100;
+    api.persist?.();
+    refresh();
+  });
   // periodic light refresh
   setInterval(refresh, 1500);
   refresh();
@@ -322,11 +330,9 @@ function wireDocumentCenter(api) {
     if (docState.open) applyPreviewZoom();
   });
 
-  $("#v5-docs-print")?.addEventListener("click", () => doPrint(api));
-  $("#v5-docs-svg")?.addEventListener("click", () => downloadSvgPages(api));
-  $("#v5-docs-png")?.addEventListener("click", () => downloadPngPages(api));
-  $("#v5-docs-ptouch")?.addEventListener("click", () => downloadPtouch(api));
-  $("#v5-docs-zip")?.addEventListener("click", () => downloadZip(api));
+  for (const [id, action] of Object.entries({print:doPrint,svg:downloadSvgPages,png:downloadPngPages,ptouch:downloadPtouch,zip:downloadZip})) {
+    $(`#v5-docs-${id}`)?.addEventListener("click", () => prepareDelivery(api, () => action(api)));
+  }
   $("#v5-docs-settings")?.addEventListener("click", () => openDocSettings(api));
   $("#v5-docs-signoff")?.addEventListener("click", () => openSignoffDialog(api));
 }
@@ -344,13 +350,15 @@ function buildMatches(design) {
 }
 
 function collectPack(api, { interactive = false } = {}) {
-  const design = api.getDesign();
-  const assembly = api.getAssembly();
-  const net = buildDeliveryNet(design,assembly,api.getNet());
-  const issues = [...(api.getIssues?.() || []),...net.wiringIssues];
+  const design = structuredClone(api.getDesign());
+  const assembly = structuredClone(api.getAssembly());
+  const net = buildDeliveryNet(design,assembly,structuredClone(api.getNet()));
+  const issues = [...structuredClone(api.getIssues?.() || []),...net.wiringIssues];
   const bom = buildBom(design, assembly, net);
   const labels = applyLabelRules(design, net);
   const matches = buildMatches(design);
+  let cabinetImage=null;
+  try {cabinetImage=api.cabinetImage?.()||null;} catch(error) {console.warn('配电箱三维图片生成失败',error);}
   const pack = buildDocumentPack({
     design,
     assembly,
@@ -360,14 +368,15 @@ function collectPack(api, { interactive = false } = {}) {
     labels,
     matches,
     interactive,
+    cabinetImage,
     uiMode: design?.uiMode || api.uiMode?.() || "simple",
   });
-  return { ...pack, design, assembly, net, issues, bom, labels, matches };
+  return { ...pack,pages:paginateDocumentPages(pack.pages,pack.metadata), design, assembly, net, issues, bom, labels, matches };
 }
 
 function selectedPages(pack) {
-  if (!docState.selected) return pack.pages;
-  return pack.pages.filter((p) => docState.selected.has(p.id));
+  const pages = docState.selected ? pack.pages.filter((p) => docState.selected.has(p.id)) : pack.pages;
+  return pages.map((page,index)=>({...page,html:page.html?.replace(/第 \d+ \/ \d+ 页/g,`第 ${index+1} / ${pages.length} 页`)}));
 }
 
 function renderDocs(api) {
@@ -402,7 +411,7 @@ function renderDocs(api) {
         (p) =>
           `<p class="v5-doc-caption">${esc(p.title)}</p>` +
           `<section class="v5-doc-sheet" data-size="${esc(p.pageSize || "A4")}" data-page="${esc(p.id)}">${
-            p.svg || p.html || ""
+            p.html || p.svg || ""
           }</section>`,
       )
       .join("");
@@ -473,7 +482,7 @@ function wirePreviewInteractions(api, preview) {
 
 /* ---------- 打印 ---------- */
 
-function doPrint(api) {
+async function doPrint(api) {
   const pack = collectPack(api, { interactive: false });
   const pages = selectedPages(pack);
   if (!pages.length) return api.toast?.("请先勾选要打印的页面");
@@ -482,9 +491,16 @@ function doPrint(api) {
   root.innerHTML = pages
     .map(
       (p) =>
-        `<section class="print-sheet" data-size="${esc(p.pageSize || "A4")}">${p.svg || p.html || ""}</section>`,
+        `<section class="print-sheet" data-size="${esc(p.pageSize || "A4")}">${p.html || p.svg || ""}</section>`,
     )
     .join("");
+  try {
+    const images=[...root.querySelectorAll('img')];
+    if(images.length)await Promise.all(images.map(image=>image.decode()));
+  } catch {
+    root.innerHTML='';
+    return api.toast?.('图片无法载入，请重新上传现场照片或重新生成三维图后再导出');
+  }
   const cleanup = () => {
     root.innerHTML = "";
     window.removeEventListener("afterprint", cleanup);
@@ -585,6 +601,7 @@ async function downloadZip(api) {
   try {
     const pack = collectPack(api, { interactive: false });
     const design = pack.design;
+    const shot = api.screenshot?.();
     const files = buildHandoverFiles({
       design,
       net: pack.net,
@@ -592,7 +609,8 @@ async function downloadZip(api) {
       bom: pack.bom,
       labels: pack.labels,
       pages: pack.pages,
-      standaloneHtml: api.standaloneHtml?.(),
+      standaloneHtml: await api.standaloneHtml?.(design),
+      documentCss,
     });
     const bin = {};
     for (const [name, text] of Object.entries(files)) bin[name] = strToU8(text);
@@ -604,7 +622,6 @@ async function downloadZip(api) {
     } catch {
       /* 光栅化不可用时跳过，不阻断打包 */
     }
-    const shot = api.screenshot?.();
     if (typeof shot === "string" && shot.startsWith("data:image/png;base64,")) {
       bin["三维快照.png"] = base64ToBytes(shot.slice("data:image/png;base64,".length));
     }
@@ -630,6 +647,43 @@ function base64ToBytes(b64) {
 
 /* ---------- 对话框 ---------- */
 
+function today() {
+  const now=new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+}
+
+function revisionDate(value) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||new Date(`${value}T12:00:00Z`).toISOString().slice(0,10)!==value) throw new Error('请填写有效日期');
+  return `${value}T12:00:00`;
+}
+
+function prepareDelivery(api, action) {
+  const design=api.getDesign(),pack=collectPack(api);
+  if(pack.pages.some(page=>page.html?.includes('data-layout-overflow="true"'))) {
+    api.toast?.('有单条内容超过一页，请缩短过长备注后再导出；文档预览中可检查该条记录');return;
+  }
+  if(pack.pages.some(page=>page.html?.includes('paper-label-overflow'))) {
+    api.toast?.('标签文字超出格子，请在文档设置扩大格子或缩短标签后再导出');return;
+  }
+  const dlg=dialog('交付前记录',`
+    <p>当前 ${esc(revisionLabel(design))}。本次输出的图纸、封面与交底包使用同一修订。</p>
+    <label>修订摘要<textarea id="v5-export-summary" rows="2" placeholder="填写本次交付变更"></textarea></label>
+    <label>修订日期<input type="date" id="v5-export-date" value="${today()}"></label>
+    <p id="v5-export-error" role="alert"></p>`,
+    `<button id="v5-export-cancel">取消</button><button id="v5-export-current" ${design.revisions?.length?'':'disabled'}>使用当前修订</button><button id="v5-export-new" class="primary">记录修订并继续</button>`);
+  const run=()=>{dlg.close();renderDocs(api);Promise.resolve().then(action).catch(e=>api.toast?.(`交付失败：${e.message}`));};
+  $('#v5-export-cancel',dlg).onclick=()=>dlg.close();
+  $('#v5-export-current',dlg).onclick=run;
+  $('#v5-export-new',dlg).onclick=()=>{
+    try {
+      const summary=$('#v5-export-summary',dlg).value.trim();
+      if(!summary) throw new Error('请填写修订摘要');
+      addRevision(design,summary,{errors:pack.issues.filter(i=>i.level==='error').length,pending:pack.issues.filter(i=>i.level!=='error').length},revisionDate($('#v5-export-date',dlg).value));
+      api.persist?.();run();
+    } catch(e) {$('#v5-export-error',dlg).textContent=e.message;}
+  };
+}
+
 function dialog(title, bodyHtml, footHtml = "") {
   let dlg = $("#v5-dialog");
   if (!dlg) {
@@ -650,6 +704,7 @@ function dialog(title, bodyHtml, footHtml = "") {
 function openDocSettings(api) {
   const design = api.getDesign();
   const rules = design.labelRules || {};
+  const sheet = normalizeLabelSheet(design.labelSheet);
   const dlg = dialog(
     "文档设置",
     `
@@ -657,27 +712,46 @@ function openDocSettings(api) {
     <label>回路标签模板<input id="v5-t-circuit" value="${esc(rules.circuitLabel || "{id} {name}")}"></label>
     <label>面标模板<input id="v5-t-face" value="${esc(rules.faceLabel || "{id}")}"></label>
     <label>导线标签模板<input id="v5-t-wire" value="${esc(rules.wireTag || "{circuit}-{conductor}")}"></label>
+    <label>标签纸规格<select id="v5-label-preset">${[['module','按器件模位剪裁'],['a4-30','A4 · 30 格'],['a4-48','A4 · 48 格'],['custom','A4 · 自定义']].map(([id,name])=>`<option value="${id}" ${sheet.preset===id?'selected':''}>${name}</option>`).join('')}</select></label>
+    <div class="v5-label-fields">${[['rows','行数'],['columns','列数'],['marginTop','上边距 mm'],['marginBottom','下边距 mm'],['marginLeft','左边距 mm'],['marginRight','右边距 mm'],['gapX','列间距 mm'],['gapY','行间距 mm']].map(([id,name])=>`<label>${name}<input type="number" min="0" step="${['rows','columns'].includes(id)?1:.1}" id="v5-label-${id}" value="${sheet[id]}"></label>`).join('')}</div>
+    <p class="tip">标签按 A4 实际尺寸输出；打印请选择 100% / 实际大小，关闭页眉页脚。按实际标签纸调整边距和间距。</p>
     <label>二维码模式
       <select id="v5-t-qrmode">
-        <option value="offline" ${rules.qrMode !== "online" ? "selected" : ""}>离线文本（可直接扫码读取）</option>
-        <option value="online" ${rules.qrMode === "online" ? "selected" : ""}>在线链接（需填基址）</option>
+        <option value="disabled" ${rules.qrMode !== "online" ? "selected" : ""}>暂不生成（项目网页待接入）</option>
+        <option value="online" ${rules.qrMode === "online" ? "selected" : ""}>打开项目网页（HTTPS）</option>
       </select>
     </label>
-    <label>在线基址 publicBaseUrl
-      <input id="v5-t-base" placeholder="https://example.com" value="${esc(design.publicBaseUrl || "")}">
+    <label>项目网页地址
+      <input id="v5-t-base" placeholder="https://你的域名/projects/项目编号" value="${esc(design.qrProjectUrl || "")}">
     </label>
-    <p class="tip">在线模式未填基址时二维码留空，不会生成无效链接。</p>
+    <p class="tip">请填写后续为本项目开设的手机网页。铭牌打开该网址；回路码附带 ?c=回路编号，供网页定位。未配置时不生成二维码，也不生成微信无法展示的文本码。</p>
+    <p class="tip">网址需使用公网 HTTPS；保存配置不代表网站已发布。批量打印前请用手机微信实际扫码确认能打开正确项目。</p>
+    <p id="v5-settings-error" role="alert"></p>
     `,
     `<button type="button" id="v5-t-cancel">取消</button><button type="button" class="primary" id="v5-t-save">保存</button>`,
   );
+  const syncSheet = () => {
+    const preset = $('#v5-label-preset',dlg).value;
+    const values = normalizeLabelSheet({preset});
+    for(const key of ['rows','columns','marginTop','marginBottom','marginLeft','marginRight','gapX','gapY']) {
+      const field = $(`#v5-label-${key}`,dlg);
+      if(preset!=='custom') field.value=values[key];
+      field.disabled=preset!=='custom';
+    }
+  };
+  $('#v5-label-preset',dlg).onchange=syncSheet;
+  for(const key of ['rows','columns','marginTop','marginBottom','marginLeft','marginRight','gapX','gapY']) $(`#v5-label-${key}`,dlg).disabled=sheet.preset!=='custom';
   $("#v5-t-cancel", dlg).onclick = () => dlg.close();
   $("#v5-t-save", dlg).onclick = () => {
     const mode = $("#v5-t-qrmode", dlg).value;
     const base = $("#v5-t-base", dlg).value.trim();
-    if (mode === "online" && !base) {
-      api.toast?.("在线模式需要填写基址");
-      return;
-    }
+    let labelSheet;
+    try {
+      if(mode==='online') {
+        if(!projectQrUrl({qrProjectUrl:base})) throw new Error('请填写手机可访问的公网 HTTPS 项目网页地址，不支持本机地址、账号密码或 #片段');
+      }
+      labelSheet=normalizeLabelSheet({preset:$('#v5-label-preset',dlg).value,...Object.fromEntries(['rows','columns','marginTop','marginBottom','marginLeft','marginRight','gapX','gapY'].map(key=>[key,$(`#v5-label-${key}`,dlg).value]))});
+    } catch(e) { $('#v5-settings-error',dlg).textContent=e.message; return; }
     design.labelRules = {
       ...rules,
       circuitLabel: $("#v5-t-circuit", dlg).value.trim() || "{id} {name}",
@@ -685,7 +759,8 @@ function openDocSettings(api) {
       wireTag: $("#v5-t-wire", dlg).value.trim() || "{circuit}-{conductor}",
       qrMode: mode,
     };
-    design.publicBaseUrl = base || null;
+    design.qrProjectUrl = base || null;
+    design.labelSheet=labelSheet;
     api.persist?.();
     dlg.close();
     renderDocs(api);
@@ -710,19 +785,26 @@ function openSignoffDialog(api) {
     `
     <p class="tip">当前 ${revisionLabel(design)} · ${errors} 项需修正 / ${pending} 项待核。记录修订后封面、铭牌与系统图图题栏同步更新。</p>
     <label>修订摘要<textarea id="v5-rev-summary" rows="2" placeholder="例：按现场复测调整 C12 线径"></textarea></label>
+    <label>修订日期<input type="date" id="v5-rev-date" value="${today()}"></label>
     <button type="button" id="v5-rev-add">记录一条修订</button>
     <hr style="border:none;border-top:1px solid #2a3a30;margin:14px 0">
     ${SIGNOFF_ROLES.map(
-      (r) => `<label>${SIGNOFF_ROLE_LABELS[r]}<input id="v5-sign-${r}" value="${esc(design.signoff?.[r]?.name || "")}" placeholder="姓名，留空表示未签认"></label>`,
+      (r) => `<fieldset><legend>${SIGNOFF_ROLE_LABELS[r]}</legend><label>姓名<input id="v5-sign-${r}" value="${esc(design.signoff?.[r]?.name || "")}" placeholder="姓名，留空表示未签认"></label><label>日期<input type="date" id="v5-sign-date-${r}" value="${esc(design.signoff?.[r]?.at || today())}"></label><label>备注<textarea id="v5-sign-note-${r}">${esc(design.signoff?.[r]?.note || '')}</textarea></label></fieldset>`,
     ).join("")}
     <p class="tip">签认仅记录责任人，不改变「条件性方案 · 非施工合格结论」口径。</p>
+    <p id="v5-sign-error" role="alert"></p>
     ${history ? `<table class="doc-table" style="color:#cfe0d4"><thead><tr><th>版本</th><th>时间</th><th>摘要</th><th>错误/待核</th></tr></thead><tbody>${history}</tbody></table>` : ""}
     `,
     `<button type="button" id="v5-sign-cancel">关闭</button><button type="button" class="primary" id="v5-sign-save">保存签认</button>`,
   );
 
   $("#v5-rev-add", dlg).onclick = () => {
-    const n = addRevision(design, $("#v5-rev-summary", dlg).value, { errors, pending });
+    let n;
+    try {
+      const summary=$("#v5-rev-summary",dlg).value.trim();
+      if(!summary) throw new Error('请填写修订摘要');
+      n = addRevision(design, summary, { errors, pending },revisionDate($('#v5-rev-date',dlg).value));
+    } catch(e) {$('#v5-sign-error',dlg).textContent=e.message;return;}
     api.persist?.();
     dlg.close();
     renderDocs(api);
@@ -730,9 +812,11 @@ function openSignoffDialog(api) {
   };
   $("#v5-sign-cancel", dlg).onclick = () => dlg.close();
   $("#v5-sign-save", dlg).onclick = () => {
-    for (const r of SIGNOFF_ROLES) {
-      setSignoff(design, r, { name: $(`#v5-sign-${r}`, dlg).value });
-    }
+    try {
+      const draft=structuredClone(design);
+      for (const r of SIGNOFF_ROLES) setSignoff(draft, r, {name:$(`#v5-sign-${r}`,dlg).value,at:$(`#v5-sign-date-${r}`,dlg).value,note:$(`#v5-sign-note-${r}`,dlg).value});
+      design.signoff=draft.signoff;
+    } catch(e) {$('#v5-sign-error',dlg).textContent=e.message;return;}
     api.persist?.();
     dlg.close();
     renderDocs(api);

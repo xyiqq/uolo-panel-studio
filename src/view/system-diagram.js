@@ -1,7 +1,7 @@
 /**
  * 配电系统图 SVG 生成器
- * A3 横 420×297 mm；超过 16 回路列自动分页。
- * 视觉 token 统一引用 svg-theme.js（颜色 / 字号 / 线宽 / 版面）。
+ * A4 纵向内容版心；每行两个回路，按文字高度自动分页。
+ * 颜色与字体栈统一引用 svg-theme.js；正文保持可读的固定字号。
  * 口径：条件性方案 · 非施工合格结论
  */
 
@@ -15,31 +15,24 @@ import {
   relay,
   dimmer,
   meter,
-  pe as peSym,
   gateway,
   psu,
 } from "./symbols.js";
-import { productSku, PHASES } from "../core/domain.js";
+import { productSku } from "../core/domain.js";
 import { computeBusBudgets } from "../core/buses.js";
 import { circuitModuleChannels, moduleDeliveryLinks } from "./module-delivery-links.js";
 import {
   C,
-  FS,
-  LW,
-  LAYOUT,
   PHASE_COLORS,
   PHASE_DASH,
   FONT_STACK,
   DISCLAIMER,
-  ellipsis,
 } from "./svg-theme.js";
 
-const PAGE_W = LAYOUT.pageW;
-const PAGE_H = LAYOUT.pageH;
-const COLS_PER_PAGE = LAYOUT.colsPerPage;
-const COL_W = LAYOUT.colW;
-const INLET_W = LAYOUT.inletW;
-const MARGIN = LAYOUT.margin;
+const PAGE_W = 210;
+const PAGE_H = 270;
+const BODY_SIZE = 3.5;
+const LINE_HEIGHT = 4.8;
 
 function esc(v) {
   return String(v ?? "")
@@ -103,301 +96,146 @@ function circuitRoom(design, circuit) {
   return rooms[0] || "";
 }
 
-function renderInlet(design, assembly, x, y) {
-  const q0 = findNode(assembly, "Q0");
-  const spdNode = findNode(assembly, "SPD");
-  const qspd = findNode(assembly, "QSPD");
-  const supply =
-    design.supply === "three" ? "三相 380/220 V" : "单相 220 V";
-  const mainAmps = design.mainAmps != null ? `${design.mainAmps} A` : "—";
-  const q0Name = q0 ? productSku(q0.product) : "—";
-  const q0Poles = q0?.product?.poles;
-  const q0Amps = q0?.product?.amps;
-  const spdName = spdNode ? productSku(spdNode.product) : "";
-
-  let body = "";
-  body += `<text x="${x}" y="${y}" font-size="${FS.section}" font-weight="600" fill="${C.ink}">进线区</text>`;
-  body += `<line x1="${x}" y1="${y + 2.2}" x2="${x + INLET_W - 6}" y2="${y + 2.2}" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
-  body += `<text x="${x}" y="${y + 7}" font-size="${FS.sub}" fill="${C.muted}">${esc(supply)} · In ${esc(mainAmps)}</text>`;
-  body += `<text x="${x}" y="${y + 12}" font-size="${FS.sub}" fill="${C.muted}">Q0 ${esc(q0Name)}${q0Poles != null ? ` · ${q0Poles}P` : ""}${q0Amps != null ? ` / ${q0Amps}A` : ""}</text>`;
-  if (q0) {
-    body += `<g transform="translate(${x + 8},${y + 17})">${kindSymbol(q0.product.kind, q0.product.poles)}</g>`;
-  }
-  if (spdNode) {
-    body += `<g transform="translate(${x + 30},${y + 17})">${spd()}</g>`;
-    body += `<text x="${x + 26}" y="${y + 43}" font-size="${FS.name}" fill="${C.muted}">SPD ${esc(ellipsis(spdName, 16))}</text>`;
-    if (qspd) {
-      body += `<text x="${x + 26}" y="${y + 48}" font-size="${FS.name}" fill="${C.muted}">后备 ${esc(ellipsis(productSku(qspd.product), 14))}</text>`;
+// Width is measured in mm-like SVG units; Chinese characters occupy a full em.
+// Keeping the same font size across lines avoids shrinking long identifiers.
+function wrapText(value, width, size = BODY_SIZE) {
+  const lines = [];
+  for (const paragraph of String(value ?? '—').split('\n')) {
+    let line = '', used = 0;
+    for (const character of paragraph) {
+      const advance = /[\u0000-\u007f]/.test(character) ? size * .61 : size;
+      if (line && used + advance > width) { lines.push(line); line = ''; used = 0; }
+      line += character; used += advance;
     }
+    lines.push(line || '—');
   }
-  body += `<text x="${x}" y="${y + 56}" font-size="${FS.foot}" fill="${C.faint}">接地系统 ${esc(design.earthing || "—")}</text>`;
-  return body;
+  return lines;
 }
 
-function renderBusbars(x, yTop, yBot) {
-  const labels = [...PHASES, "N", "PE"];
-  let body = "";
-  labels.forEach((lab, i) => {
-    const xx = x + i * 5;
-    const dash = PHASE_DASH[lab] ? ` stroke-dasharray="${PHASE_DASH[lab]}"` : "";
-    body += `<line x1="${xx}" y1="${yTop}" x2="${xx}" y2="${yBot}" stroke="${PHASE_COLORS[lab]}" stroke-width="${LW.bus}"${dash}/>`;
-    body += `<text x="${xx}" y="${yTop - 2}" text-anchor="middle" font-size="${FS.bus}" font-weight="600" fill="${PHASE_COLORS[lab]}">${lab}</text>`;
-  });
-  body += `<g transform="translate(${x - 2},${yBot + 2}) scale(0.7)">${peSym()}</g>`;
-  return body;
+function textLines(lines, x, y, { size = BODY_SIZE, fill = C.ink, weight = 400 } = {}) {
+  return lines.map((line, i) => `<text x="${x}" y="${y + i * LINE_HEIGHT}" font-size="${size}" font-weight="${weight}" fill="${fill}">${esc(line)}</text>`).join('');
 }
 
-function renderCircuitColumn(design, assembly, circuit, match, x, y) {
-  const node =
-    findNode(assembly, circuit.id) ||
-    findNode(assembly, `${circuit.id}-RCD`);
-  const rcdNode = findNode(assembly, `${circuit.id}-RCD`);
+function pageFrame(design, content, index, total) {
+  const title = wrapText(`配电连接关系示意 · ${design.name || '未命名方案'}`, 184, 4).slice(0, 2);
+  const rev = `Rev ${design.revisions?.length || 0}`;
+  const stamp = `${rev} · ${String(design.updatedAt || design.createdAt || '日期未记录').slice(0, 10)} · 签认 ${design.signoff?.designer?.name || design.signoff?.reviewer?.name || '未签认'}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PAGE_W} ${PAGE_H}" width="${PAGE_W}mm" height="${PAGE_H}mm" data-page="${index + 1}" role="img" aria-label="配电系统图，第 ${index + 1} 页" font-family="${FONT_STACK}">
+    <rect width="100%" height="100%" fill="${C.paper}"/>
+    <rect x="10" y="5" width="190" height="24" rx="2" fill="${C.headerBg}"/>
+    ${textLines(title, 13, 12, {size:4, weight:700})}
+    ${textLines(wrapText(stamp, 180, 2.8).slice(0,2), 13, 22, {size:2.8, fill:C.muted})}
+    ${content}
+    <line x1="10" y1="258" x2="200" y2="258" stroke="${C.line}" stroke-width=".3"/>
+    <text x="10" y="264" font-size="2.8" fill="${C.danger}">${esc(DISCLAIMER)}</text>
+    <text x="200" y="264" text-anchor="end" font-size="2.8" fill="${C.muted}">第 ${index + 1} / ${total} 页 · A4 纵版</text>
+  </svg>`;
+}
+
+function circuitCard(design, assembly, circuit, match = {}, net = {}) {
+  const node = findNode(assembly, circuit.id) || findNode(assembly, `${circuit.id}-RCD`);
   const product = node?.product;
-  const kind = product?.kind || "mcb";
-  const poles = product?.poles || 1;
-  const sku = product ? productSku(product) : "—";
-  const amps = product?.amps;
-  const residual = product?.residual;
-  const room = circuitRoom(design, circuit);
-  const ib = match?.ib;
-  const p = match?.p;
-  const cable = match?.cable;
-  const section = match?.section;
+  const channels = circuitModuleChannels(design, circuit);
+  const associated = (assembly?.nodes || []).filter(n => n.id.startsWith(`${circuit.id}-`) && n.id !== node?.id);
+  const protection = [product?.amps != null ? `额定 ${product.amps} A` : '额定电流待核', product?.residual != null ? `漏电 ${product.residual} mA` : ''].filter(Boolean).join(' / ');
+  const wires = (net?.wires || []).filter(w => w.circuit === circuit.id ||
+    [w.from,w.to].some(port => String(port || '').startsWith(`${circuit.id}:`) || String(port || '').startsWith(`${circuit.id}-RCD:`) || String(port || '').startsWith(`X-${circuit.id}:`)));
+  const connections = wires.map(w => `${w.conductor === 'N' ? '零线 N' : w.conductor === 'PE' ? '地线 PE' : w.conductor ? `火线 ${w.conductor}` : w.scope || '连接'}：${w.from} → ${w.to}${w.connected === false ? '（断开）' : w.connected !== true ? '（状态待核）' : ''}`);
+  const fields = [
+    ['接线', connections.length ? connections.join('\n') : '未生成接线，来源与去向待核'],
+    ['型号', product ? productSku(product) : '未选设备'],
+    ['保护', protection],
+    ['线缆', match.cable || (match.section != null ? `${match.section} mm²` : '待确认')],
+    ['供电', `${circuit.phase || '相位待确认'} · ${circuitRoom(design, circuit) || '区域未填写'}`],
+    ['负载', `${match.p != null ? `${fmtNum(match.p / 1000)} kW` : '功率待核'} / ${match.ib != null ? `${fmtNum(match.ib)} A` : '工作电流待核'}`],
+    ...(associated.length ? [['附属', associated.map(n => `${n.id} ${productSku(n.product)}`).join(' / ')]] : []),
+    ...(channels.length ? [['控制', channels.map(c => `${c.moduleId} CH${c.channel}`).join(' / ')]] : []),
+    ...(circuit.path ? [['路径', circuit.path]] : []),
+  ];
+  const heading = wrapText(`${circuit.id} · ${circuit.name || '未命名回路'}`, 84, 3.5);
+  const lines = fields.flatMap(([label, value]) => wrapText(`${label}：${value}`, 65));
+  return {circuit, product, heading, lines, height:Math.max(95, 12 + heading.length * LINE_HEIGHT + lines.length * LINE_HEIGHT)};
+}
 
-  const tx = LAYOUT.colTextX;
-  let body = `<g data-circuit="${esc(circuit.id)}" transform="translate(${x},${y})">`;
-  body += `<rect x="0" y="0" width="${COL_W - 1.5}" height="${LAYOUT.colH}" fill="${C.card}" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
-  // 顶部：回路 id + 名称 + 分隔线
-  body += `<text x="${tx}" y="5" font-size="${FS.id}" font-weight="600" fill="${C.ink}">${esc(circuit.id)}</text>`;
-  body += `<text x="${tx}" y="9.6" font-size="${FS.name}" fill="${C.muted}">${esc(ellipsis(circuit.name || "", 9))}</text>`;
-  body += `<line x1="${tx}" y1="11.6" x2="${COL_W - 2.5}" y2="11.6" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
+function drawCard(card, x, y) {
+  const titleHeight = 6 + card.heading.length * LINE_HEIGHT;
+  let content = `<g data-circuit="${esc(card.circuit.id)}"><title>${esc(card.circuit.name || card.circuit.id)}</title>
+    <rect x="${x}" y="${y}" width="92" height="${card.height}" rx="2" fill="${C.card}" stroke="${C.line}" stroke-width=".3"/>
+    ${textLines(card.heading, x + 4, y + 6, {size:3.5,weight:600})}
+    <line x1="${x + 4}" y1="${y + titleHeight}" x2="${x + 88}" y2="${y + titleHeight}" stroke="${C.line}" stroke-width=".3"/>
+    ${textLines(card.lines, x + 23, y + titleHeight + 6)}
+    ${card.product ? `<g transform="translate(${x + 9},${y + titleHeight + 6}) scale(.8)">${kindSymbol(card.product.kind, card.product.poles || 1)}</g>` : ''}`;
+  content += `<text x="${x + 4}" y="${y + titleHeight + 30}" font-size="2.8" fill="${C.muted}">${card.product ? '保护器' : '待选型'}</text></g>`;
+  return content;
+}
 
-  let sy = LAYOUT.symY;
-  body += `<g transform="translate(${LAYOUT.symX},${sy}) scale(0.85)">${kindSymbol(kind, poles)}</g>`;
-  sy += 20;
-  if (rcdNode && rcdNode.id !== node?.id) {
-    body += `<g transform="translate(${LAYOUT.symX},${sy}) scale(0.75)">${rcd()}</g>`;
-    sy += 18;
-  }
-
-  // 控制 / 计量模块（同回路附属节点）：虚线分组框 + Kx 短代号标注
-  const mods = [];
-  for (const n of assembly?.nodes || []) {
-    if (!n.id.startsWith(circuit.id + "-")) continue;
-    if (n.id.endsWith("-RCD")) continue;
-    const k = n.product?.kind;
-    if (
-      ["contactor", "relay", "dimmer", "meter", "gateway", "psu"].includes(k)
-    ) {
-      mods.push(n);
+/** A4 portrait SVG pages, ready to place within the document's print margins. */
+export function renderSystemDiagram(design = {}, assembly, net, matches = {}) {
+  const bodies = [];
+  const intro = textLines(['怎么看：箭头由起点指向终点，按编号查找保护器、模块或出箱端子。', 'N = 零线；PE = 保护地线；CH = 通道。本页为关系示意，非标准电气原理图。'], 10, 36, {size:2.9,fill:C.muted});
+  const q0 = findNode(assembly, 'Q0');
+  const supply = `${design.supply === 'three' ? '三相 380/220 V' : '单相 220 V'} · 总开关 ${q0?.product?.amps ?? design.mainAmps ?? '待核'} A · 接地 ${design.earthing || '待核'}`;
+  const cards = (design.circuits || []).map(c => circuitCard(design, assembly, c, matches?.[c.id], net));
+  // Split an exceptionally long card without shrinking text or dropping fields.
+  const segments = cards.flatMap(card => {
+    const parts = [];
+    const allLines = [...card.heading.slice(2), ...card.lines];
+    for (let offset = 0; offset < Math.max(1, allLines.length); offset += 35) {
+      const lines = allLines.slice(offset, offset + 35);
+      parts.push({...card, heading:offset ? [`${card.circuit.id} · 续页`] : card.heading.slice(0,2), lines,
+        height:Math.max(95, 12 + Math.min(2, card.heading.length) * LINE_HEIGHT + lines.length * LINE_HEIGHT)});
     }
+    return parts;
+  });
+  let content = intro + textLines([supply], 10, 48, {size:3.1}), y = 55;
+  for (let index = 0; index < segments.length; index += 2) {
+    const row = segments.slice(index, index + 2);
+    const height = Math.max(...row.map(card => card.height));
+    if (y + height > 253) { bodies.push(content); content = intro + textLines([supply], 10, 48, {size:3.1}); y = 55; }
+    row.forEach((card, column) => { content += drawCard(card, 10 + column * 98, y); });
+    y += height + 5;
   }
-  if (mods.length) {
-    const boxTop = sy - 2;
-    for (const n of mods) {
-      body += `<g transform="translate(${LAYOUT.symX},${sy}) scale(0.7)">${kindSymbol(n.product.kind, 1)}</g>`;
-      body += `<text x="1.5" y="${sy + 4}" font-size="${FS.tiny}" fill="${C.accent}">${esc(moduleTag(n.id))}</text>`;
-      sy += 16;
-    }
-    body += `<rect x="0.6" y="${boxTop}" width="${COL_W - 2.7}" height="${sy - boxTop - 2}" fill="none" stroke="${C.accent}" stroke-width="${LW.thin}" stroke-dasharray="1.6 1.2" rx="1"/>`;
-  }
+  if (!cards.length) content += textLines(['尚未配置供电回路；如已配置智能模块，请继续查看后续连接关系页。'],10,62,{fill:C.muted});
+  // Text and dash patterns make the phase key understandable in grayscale printing.
+  ['L1','L2','L3','N','PE'].forEach((phase,index) => {
+    const x=10+index*37;
+    content += `<line x1="${x}" x2="${x+8}" y1="254" y2="254" stroke="${PHASE_COLORS[phase]}" stroke-width=".6"${PHASE_DASH[phase] ? ` stroke-dasharray="${PHASE_DASH[phase]}"` : ''}/><text x="${x+10}" y="255" font-size="2.8" fill="${C.muted}">${phase}</text>`;
+  });
+  bodies.push(content);
 
-  const sharedChannels = circuitModuleChannels(design, circuit);
-  if (sharedChannels.length) {
-    body += `<text x="${tx}" y="108" font-size="${FS.body}" fill="${C.accent}">${esc(ellipsis(sharedChannels.map(d => `${d.moduleId} CH${d.channel}`).join(' / '), 14))}</text>`;
-    body += `<text x="${tx}" y="112" font-size="${FS.tiny}" fill="${C.faint}">完整关联见模块链路页</text>`;
-  }
-
-  // 参数区：标签:值 两色排版，行距统一为 colTextStep
-  const ty = (i) => LAYOUT.colTextY0 + i * LAYOUT.colTextStep;
-  const field = (i, label, value, valueFill = C.muted) =>
-    `<text x="${tx}" y="${ty(i)}" font-size="${FS.body}">` +
-    `<tspan fill="${C.faint}">${label} </tspan>` +
-    `<tspan fill="${valueFill}">${esc(value)}</tspan></text>`;
-
-  body += `<line x1="${tx}" y1="${ty(0) - 3.4}" x2="${COL_W - 2.5}" y2="${ty(0) - 3.4}" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
-  body += `<text x="${tx}" y="${ty(0)}" font-size="${FS.body}" fill="${C.muted}">${esc(ellipsis(sku, 13))}</text>`;
-  body += field(
-    1,
-    "保护",
-    [
-      amps != null ? `In ${amps}A` : null,
-      residual != null ? `Δn ${residual}mA` : null,
-    ]
-      .filter(Boolean)
-      .join(" ") || "—",
-  );
-  body += field(2, "线缆", cable || (section != null ? `${section} mm²` : "—"));
-  body += field(
-    3,
-    "相位",
-    circuit.phase || "—",
-    PHASE_COLORS[circuit.phase] || C.muted,
-  );
-  body += field(4, "区域", room ? ellipsis(room, 10) : "—");
-  body += field(5, "Pe", p != null ? `${fmtNum(p / 1000, 2)} kW` : "—");
-  body += field(6, "Ib", ib != null ? `${fmtNum(ib, 2)} A` : "—");
-  body += `<text x="${tx}" y="${ty(7)}" font-size="${FS.tiny}" fill="${C.faint}">${esc(ellipsis((circuit.path || "").split("/")[0] || "", 14))}</text>`;
-  body += `</g>`;
-  return body;
-}
-
-/** 模块在系统图中的短代号（K1/K2…），避免与回路 id 混淆 */
-function moduleTag(id) {
-  const m = /-(\d+)$/.exec(String(id || ""));
-  return m ? `K${m[1]}` : "K";
-}
-
-function renderTitleBar(design, pageIndex, pageCount) {
-  const name = textOrDash(design?.name);
-  const idRaw = design?.designId;
-  const idShort =
-    idRaw && String(idRaw).length >= 8
-      ? String(idRaw).slice(0, 8)
-      : idRaw
-        ? String(idRaw)
-        : "—";
-  const rev =
-    design?.revisions?.length != null && design.revisions.length > 0
-      ? `Rev ${design.revisions.length}`
-      : design?.revision
-        ? `Rev ${design.revision}`
-        : "—";
-  const date = design?.updatedAt || design?.createdAt || "";
-  const dateStr = date ? String(date).slice(0, 10) : "—";
-  const sign =
-    design?.signoff?.designer?.name ||
-    design?.signoff?.reviewer?.name ||
-    "未签认";
-
-  // 两行栅格：左列标题/元信息，右列免责声明/页码，避免互撞
-  return (
-    `<rect x="0" y="0" width="${PAGE_W}" height="${LAYOUT.headerH}" fill="${C.headerBg}"/>` +
-    `<rect x="0" y="${LAYOUT.headerH - 0.6}" width="${PAGE_W}" height="0.6" fill="${C.accent}" opacity="0.55"/>` +
-    `<text x="${MARGIN}" y="6.2" font-size="${FS.title}" font-weight="700" fill="${C.ink}">系统图 · ${esc(ellipsis(name, 40))}</text>` +
-    `<text x="${MARGIN}" y="12" font-size="${FS.sub}" fill="${C.muted}">编号 ${esc(idShort)} · ${esc(rev)} · ${esc(dateStr)} · 签认 ${esc(sign)}</text>` +
-    `<text x="${PAGE_W - MARGIN}" y="6.2" text-anchor="end" font-size="${FS.sub}" fill="${C.danger}" font-weight="600">${esc(DISCLAIMER)}</text>` +
-    `<text x="${PAGE_W - MARGIN}" y="12" text-anchor="end" font-size="${FS.sub}" fill="${C.muted}">第 ${pageIndex + 1} / ${pageCount} 页 · A3 横版</text>`
-  );
-}
-
-function renderWatermark() {
-  return (
-    `<text x="${PAGE_W / 2}" y="${PAGE_H / 2}" text-anchor="middle" ` +
-    `font-size="${FS.watermark}" fill="${C.watermark}" opacity="0.32" ` +
-    `transform="rotate(-18 ${PAGE_W / 2} ${PAGE_H / 2})">${esc(DISCLAIMER)}</text>`
-  );
-}
-
-function renderBusFooter(design, pageIndex, pageCount) {
-  const buses = design?.buses || [];
-  const left = !buses.length
-    ? "总线：本方案未配置智能总线"
-    : `总线：${buses.length} 条 · 预算及成员见模块链路页`;
-  return (
-    `<text x="${MARGIN}" y="${PAGE_H - 4}" font-size="${FS.foot}" fill="${C.faint}">${esc(left)}</text>` +
-    `<text x="${PAGE_W / 2}" y="${PAGE_H - 4}" text-anchor="middle" font-size="${FS.foot}" fill="${C.danger}">${esc(DISCLAIMER)}</text>` +
-    `<text x="${PAGE_W - MARGIN}" y="${PAGE_H - 4}" text-anchor="end" font-size="${FS.foot}" fill="${C.faint}">— ${pageIndex + 1}/${pageCount} —</text>`
-  );
-}
-
-/**
- * @param {object} design
- * @param {object} assembly
- * @param {object} net
- * @param {Record<string, object>} [matches]
- * @returns {{ pages: string[] }}
- */
-export function renderSystemDiagram(design, assembly, net, matches) {
-  const matchMap = matches && typeof matches === "object" ? matches : {};
-  const circuits = design?.circuits || [];
-  const circuitPageCount = Math.max(1, Math.ceil(circuits.length / COLS_PER_PAGE) || 1);
   const links = moduleDeliveryLinks(design, net);
-  const budgets = computeBusBudgets(design, (assembly?.nodes || []).map(n => n.product).filter(Boolean));
-  for (const budget of budgets) {
+  const recordedLinks = new Set(links.map(link => `${link.from}>${link.to}`));
+  // Include upstream supply, surge protection and enclosure earth connections;
+  // the circuit cards alone only show the wires assigned to each branch.
+  for (const wire of net?.wires || []) {
+    if (wire.circuit || recordedLinks.has(`${wire.from}>${wire.to}`)) continue;
+    links.push({from:wire.from,to:wire.to,kind:wire.scope || '公共供电连接',
+      detail:[wire.conductor,wire.section != null ? `${wire.section}${typeof wire.section === 'number' ? ' mm²' : ''}` : '线径待核',wire.connected === false ? '断开' : wire.connected === true ? '方案已连接' : '连接状态待核'].filter(Boolean).join(' · ')});
+  }
+  for (const budget of computeBusBudgets(design, (assembly?.nodes || []).map(n => n.product).filter(Boolean))) {
     const bus = design.buses.find(b => b.id === budget.id);
     links.push({from:`总线 ${budget.label || budget.id} (${budget.type})`,to:`设备 ${(bus.deviceModuleIds || []).join(' / ') || '—'}`,
       kind:`电源 ${(bus.psuModuleIds || []).join(' / ') || '未配置'}`,
       detail:`预算 ${budget.usedKnown ? textOrDash(budget.used) : '待核'}/${budget.capacityKnown ? textOrDash(budget.capacity) : '待核'} ${budget.unit || ''} · ${budget.deviceCount} 台${budget.overBudget ? ' · 超预算' : ''}`});
   }
-  // Wrap all identifiers instead of truncating them; variable-height rows paginate.
-  const wrapped = value => String(value || '—').match(/.{1,34}/gu) || ['—'];
-  const linkPages = [];
-  let current = [], height = 0;
+  const linkHeader = textLines(['电源与模块连接关系 · 对照编号找到设备与端口'], 10, 36, {size:3.6,weight:600})
+    + textLines(['从左向右阅读：起点 → 终点；“待核”表示尚需确认，不能视为已接通。'],10,43,{size:2.9,fill:C.muted})
+    + `<rect x="10" y="47" width="190" height="8" fill="${C.headerBg}"/>`
+    + ['起点（从哪里来）','终点（接到哪里）','连接用途 / 核对信息'].map((title,i)=>textLines([title],[13,66,119][i],52,{size:3,weight:600})).join('');
+  content = linkHeader; y = 55;
   for (const link of links) {
-    const cells = [link.from,link.to,`${link.kind}\n${link.detail}`].map(v => String(v).split('\n').flatMap(wrapped));
-    const lineCount = Math.max(...cells.map(c => c.length));
-    for (let offset=0;offset<lineCount;offset+=48) {
-      const part = cells.map(c => c.slice(offset,offset+48));
-      const rowHeight = Math.max(...part.map(c => c.length)) * 4 + 6;
-      if (current.length && height + rowHeight > 244) { linkPages.push(current); current = []; height = 0; }
-      current.push({link,cells:part,height:rowHeight}); height += rowHeight;
-    }
-  }
-  if (current.length) linkPages.push(current);
-  const pageCount = circuitPageCount + linkPages.length;
-  const pages = [];
-
-  for (let pi = 0; pi < circuitPageCount; pi++) {
-    const slice = circuits.slice(pi * COLS_PER_PAGE, (pi + 1) * COLS_PER_PAGE);
-    const busX = MARGIN + INLET_W + 4;
-    const colStartX = busX + 28;
-    const colY = LAYOUT.colY;
-
-    let content = "";
-    content += renderTitleBar(design, pi, pageCount);
-    content += renderWatermark();
-    if (pi === 0) {
-      content += renderInlet(design, assembly, MARGIN, 24);
-    } else {
-      content += `<text x="${MARGIN}" y="30" font-size="${FS.sub}" fill="${C.faint}">（续页）进线区见第 1 页</text>`;
-    }
-    content += renderBusbars(busX, LAYOUT.busTop, LAYOUT.busBot);
-
-    slice.forEach((c, i) => {
-      const x = colStartX + i * COL_W;
-      content += renderCircuitColumn(
-        design,
-        assembly,
-        c,
-        matchMap[c.id],
-        x,
-        colY,
-      );
-      // 母排到列的引线：浅色 L 型折线，避免与相线色彩混淆
-      content +=
-        `<path d="M${busX + 20} ${LAYOUT.busTop + 12 + (i % 5)} H${x + 8} V${colY}" ` +
-        `fill="none" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
-    });
-
-    content += renderBusFooter(design, pi, pageCount);
-
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PAGE_W} ${PAGE_H}" ` +
-      `width="${PAGE_W}mm" height="${PAGE_H}mm" data-page="${pi + 1}" font-family="${FONT_STACK}">` +
-      `<rect width="100%" height="100%" fill="${C.paper}"/>` +
-      content +
-      `</svg>`;
-    pages.push(svg);
-  }
-
-  linkPages.forEach((rows, index) => {
-    const pi = circuitPageCount + index;
-    let content = renderTitleBar(design,pi,pageCount);
-    content += `<text x="10" y="25" font-size="${FS.section}" fill="${C.ink}">模块链路 · 馈电 / 通道 / 接线端子 / 总线预算</text>`;
-    let y = 32;
-    for (const {link,cells,height} of rows) {
-      content += `<g data-link-from="${esc(link.from)}" data-link-to="${esc(link.to)}"><rect x="10" y="${y}" width="400" height="${height}" fill="${C.card}" stroke="${C.line}" stroke-width="${LW.thin}"/>`;
-      const mid = y + height / 2;
-      content += `<path d="M105 ${mid} H138 M135 ${mid-1.5} L138 ${mid} L135 ${mid+1.5}" fill="none" stroke="${C.accent}" stroke-width="${LW.sym}"/>`;
-      cells.forEach((lines,column) => lines.forEach((line,i) => {
-        content += `<text x="${14 + column * 132}" y="${y + 5 + i * 4}" font-size="${FS.sub}" fill="${C.ink}">${esc(line)}</text>`;
-      }));
+    const cells = [link.from,link.to,`${link.kind}\n${link.detail}`].map((v,i)=>wrapText(v,[47,47,77][i]));
+    const count = Math.max(...cells.map(lines => lines.length));
+    for (let offset=0;offset<count;offset+=39) {
+      const part = cells.map(lines => lines.slice(offset,offset+39));
+      const height = Math.max(...part.map(lines => lines.length)) * LINE_HEIGHT + 6;
+      if (y + height > 253) { bodies.push(content); content = linkHeader; y = 55; }
+      content += `<g data-link-from="${esc(link.from)}" data-link-to="${esc(link.to)}"><rect x="10" y="${y}" width="190" height="${height}" fill="${C.card}" stroke="${C.line}" stroke-width=".25"/>`;
+      part.forEach((lines,i)=>{ content += textLines(lines,[13,66,119][i],y+5); });
       content += '</g>'; y += height;
     }
-    content += renderBusFooter(design,pi,pageCount);
-    pages.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PAGE_W} ${PAGE_H}" width="${PAGE_W}mm" height="${PAGE_H}mm" data-page="${pi+1}" font-family="${FONT_STACK}"><rect width="100%" height="100%" fill="${C.paper}"/>${content}</svg>`);
-  });
+  }
+  if (links.length) bodies.push(content);
+  return {pages:bodies.map((body,index)=>pageFrame(design,body,index,bodies.length))};
 
-  return { pages };
 }

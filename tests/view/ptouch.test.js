@@ -26,26 +26,26 @@ describe("ptouch · 标签数据与面标 SVG", () => {
     const rows = buildPtouchRows(ctx);
     expect(rows[0]).toEqual(["label", "line1", "line2", "qr"]);
     expect(rows.length).toBe(design.circuits.length + 1);
-    expect(rows[1][3]).toContain("PDX1|");
+    expect(rows[1][3]).toBe("");
     expect(rows[1][2]).toMatch(/A$/);
   });
 
-  it("在线模式缺基址时回落离线文本，不生成无效链接", () => {
+  it("项目网页未配置时不生成纯文本或无效二维码", () => {
     const d2 = { ...design, labelRules: { qrMode: "online" }, publicBaseUrl: null };
     const rows = buildPtouchRows({ ...ctx, design: d2 });
-    expect(rows[1][3]).toContain("PDX1|");
+    expect(rows[1][3]).toBe("");
     expect(rows[1][3]).not.toContain("http");
   });
 
-  it("在线模式填了基址才生成链接", () => {
+  it("在线模式填了项目网页才生成链接", () => {
     const d3 = {
       ...design,
       labelRules: { qrMode: "online" },
-      publicBaseUrl: "https://example.com",
+      qrProjectUrl: "https://example.com/projects/abc",
       designId: "abc",
     };
     const rows = buildPtouchRows({ ...ctx, design: d3 });
-    expect(rows[1][3]).toBe("https://example.com/d/abc?c=C01");
+    expect(rows[1][3]).toBe("https://example.com/projects/abc?c=C01");
   });
 
   it("CSV 带 BOM 与 CRLF", () => {
