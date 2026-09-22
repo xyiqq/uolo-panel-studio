@@ -3,7 +3,13 @@
  * 方案仍可保持 version:2；modules/buses 作为可选扩展字段归一化。
  */
 
+import { rowAllows } from './row-zones.js';
+import { normalizeSwitchSettings } from './network-switch-settings.js';
+import { normalizePduSettings } from './pdu-settings.js';
+import {canPlaceFootprint,reserveFootprint,placementY} from './placement-footprint.js';
+
 export const SHARED_MODULE_KINDS = [
+  "pdu",
   "relay",
   "dimmer",
   "contactor",
@@ -15,6 +21,7 @@ export const SHARED_MODULE_KINDS = [
 ];
 
 const KIND_PREFIX = {
+  pdu: "PDU",
   relay: "K",
   contactor: "K",
   timer: "K",
@@ -153,6 +160,8 @@ export function normalizeModule(raw, product = null) {
   return {
     id: raw.id,
     productId: raw.productId,
+    ...(product?.networkPorts?normalizeSwitchSettings(raw,product):{}),
+    ...(product?.outletCount?normalizePduSettings(raw,product):{}),
     label: typeof raw.label === "string" && raw.label.trim() ? raw.label.trim().slice(0, 40) : raw.id,
     busId: typeof raw.busId === "string" && raw.busId ? raw.busId : null,
     feed,
@@ -216,13 +225,13 @@ export function compactModulePlacement(assembly, design) {
     if (node.pinned) node.pinned = false;
   }
   const placed = new Map(nodes.filter((n) => n.pinned && Number.isInteger(n.row) && !n.placementError).map((n) => [n.id, { row: n.row, slot: n.slot }]));
-  const can = (n, p) => Number.isInteger(p?.row) && Number.isInteger(p?.slot) && p.row >= 0 && p.row < rows && p.slot >= 0 && p.slot + span(n.product) <= slots && occupied[p.row].slice(p.slot, p.slot + span(n.product)).every((v) => !v || v === n.id);
-  const put = (n, p) => { if (!p || !can(n, p)) { n.overflow = true; n.placementError = true; n.row = rows; n.slot = 0; return false; } for (let i = 0; i < span(n.product); i++) occupied[p.row][p.slot + i] = n.id; Object.assign(n, p, { overflow: false, placementError: false }); placed.set(n.id, p); return true; };
+  const can = (n, p) => canPlaceFootprint(design,n.product,assembly.box,occupied,p,n.id);
+  const put = (n, p) => { if (!p || !can(n, p)) { n.overflow = true; n.placementError = true; n.row = rows; n.slot = 0; return false; } reserveFootprint(n.product,assembly.box,occupied,p,n.id); Object.assign(n, p, { overflow: false, placementError: false }); placed.set(n.id, p); return true; };
   const free = (n) => { for (let r = 0; r < rows; r++) for (let s = 0; s < slots; s++) if (can(n, { row: r, slot: s })) return { row: r, slot: s }; return null; };
   for (const n of ordered) {
     if (!n.pinned && !placed.has(n.id)) put(n, free(n));
   }
-  for (const n of nodes) if (!n.overflow) { n.x = (n.slot - slots / 2) * 18 + width(n.product) / 2; n.y = assembly.box.height / 2 - assembly.box.topRail - n.row * assembly.box.pitch; }
+  for (const n of nodes) if (!n.overflow) { n.x = (n.slot - slots / 2) * 18 + width(n.product) / 2; n.y = placementY(n.product,assembly.box,n.row); }
   // 相邻槽位的同类器件（端子或非端子模块，包括手动定位）按真实宽度贴合；保留每段首器件的定位。
   // row/slot 与 occupied 仍表示安装槽位预留，x 表示实际器件中心；空槽或其它设备会断开贴合。
   for (let r = 0; r < rows; r++) {
@@ -230,7 +239,7 @@ export function compactModulePlacement(assembly, design) {
     for (let i = 1; i < line.length; i++) {
       const prev = line[i - 1], cur = line[i];
       const samePlacementGroup = (prev.product?.kind === "terminal") === (cur.product?.kind === "terminal");
-      if (samePlacementGroup && cur.slot === prev.slot + span(prev.product)) {
+      if (!prev.product.outletCount && !cur.product.outletCount && samePlacementGroup && cur.slot === prev.slot + span(prev.product)) {
         cur.x = prev.x + width(prev.product) / 2 + width(cur.product) / 2;
         cur.y = prev.y;
       }
@@ -257,6 +266,7 @@ export function normalizeBuses(design) {
       deviceModuleIds: Array.isArray(b.deviceModuleIds) ? b.deviceModuleIds.filter(Boolean) : [],
       voltage: Number.isFinite(b.voltage) ? b.voltage : null,
       section: typeof b.section==='string'?b.section.trim().slice(0,80):Number.isFinite(b.section)&&b.section>0?b.section:null,
+      cableSpec:typeof b.cableSpec==='string'?b.cableSpec.trim().slice(0,100):'',
       cableMeters:Number.isFinite(b.cableMeters)&&b.cableMeters>=0?b.cableMeters:null,
       budgetUnit: b.budgetUnit === "W" ? "W" : "mA",
       capacity: Number.isFinite(b.capacity) ? b.capacity : null,

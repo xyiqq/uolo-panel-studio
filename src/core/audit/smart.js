@@ -51,7 +51,7 @@ export function auditSmart(design, assembly, budgets = [], opts = {}) {
         ref: id,
       });
     }
-    if (b.type === "dali" && b.used != null && b.used > 250) {
+    if (b.type === "dali" && b.unit === "mA" && b.used != null && b.used > 250) {
       issues.push({
         code: "DALI_BUS_CURRENT",
         level: "error",

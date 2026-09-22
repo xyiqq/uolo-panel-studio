@@ -1,5 +1,12 @@
 import { createIcons, icons } from "lucide";
 import { clearDevices } from "../core/clear-devices.js";
+import { mountOptionalFeatures } from './optional-features.js';
+import { rowAllows } from '../core/row-zones.js';
+import { auditElectrical } from '../core/audit/electrical.js';
+import { networkSwitchFields, readNetworkSwitchFields } from './network-switch-settings.js';
+import {pduFields,readPduFields} from './pdu-settings.js';
+import {pduInstanceProduct} from '../core/pdu-settings.js';
+import {canPlaceFootprint} from '../core/placement-footprint.js';
 import {
   eX, _s, $s, Ka, kA, AX, sX, aX, Me, gA, js, Co, ea, ta, fr, Mo, W1, N1, yo, ka,
   Ue, HA, Za, Qe, bA, Eo, Yr, _r, Js
@@ -99,6 +106,7 @@ var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"
       <button type="button" class="btn" id="save-as-template" style="margin-top:8px;width:100%">${Ut("bookmark-plus")} \u5b58\u4e3a\u8bbe\u5907\u6a21\u677f</button>
       <button type="button" class="btn" id="manage-groups" style="margin-top:8px;width:100%">${Ut("shapes")} 逻辑分区…</button>
       <button type="button" class="btn danger" id="clear-devices" style="margin-top:8px;width:100%">${Ut("trash-2")} 一键清空设备</button>
+      <div id="optional-features" class="optional-features"></div>
       <div class="stat-strip"><span>\u6A21\u6570\u5360\u7528</span><span id="capacity"></span></div><div class="progress"><i id="capacity-bar"></i></div>
       <div class="source-badge" id="source-badge">${Ut("sheet")}<span id="source-badge-text"></span></div>
     </section>
@@ -154,7 +162,11 @@ function orphanCircuits(){let a=new Set(allGroups(Y).map(t=>t.id));return Y.circ
 function circuitsOfGroup(a){return a===OTHER_GROUP.id?orphanCircuits():Y.circuits.filter(t=>t.group===a)}
 function groupName(a){return groupOf(Y,a).name}
 function nextGroupId(){return"USR-GRP-"+Math.random().toString(36).slice(2,8)}
-function freeSlots(a,t){let e=[],r=kt.box,s=Math.max(1,Math.ceil((a?.modules||Math.ceil((a?.width||18)/18))||1)),n=kt.occupied;for(let o=0;o<r.rows;o++)for(let i=0;i+s<=r.slots;i++){let l=!0;for(let d=0;d<s;d++){let f=n[o][i+d];if(f&&f!==t){l=!1;break}}l&&e.push({row:o,slot:i})}return e}
+function freeSlots(a,t){
+  const product=pduInstanceProduct(a,(Y.modules||[]).find(m=>m.id===t)),slots=[];
+  for(let row=0;row<kt.box.rows;row++)for(let slot=0;slot<kt.box.slots;slot++)if(canPlaceFootprint(Y,product,kt.box,kt.occupied,{row,slot},t))slots.push({row,slot});
+  return slots;
+}
 function positionLabel(a){return`第 ${a.row+1} 排 · 第 ${a.slot+1} 位`}
 function setNodePosition(a,t){de(e=>{e.positions&&typeof e.positions=="object"||(e.positions={}),t?e.positions[a]={row:t.row,slot:t.slot}:delete e.positions[a];let r=e.circuits.find(s=>s.id===a);r&&(r.position=null)})}
 function gX(){
@@ -168,7 +180,7 @@ function gX(){
     text:i.message,
     circuit:i.ref||null,
   }));
-  Je=[...AX(Y,kt),...sX(Xe,Y),...smartIssues];
+  Je=[...AX(Y,kt),...sX(Xe,Y),...smartIssues,...auditElectrical(Y,kt,Xe,budgets).map(i=>({level:i.level,code:i.code,text:i.message,circuit:i.ref||null}))];
   EA&&!Xe.wires.some(a=>a.id===EA)&&(EA=null)
 }function Y1(){try{localStorage.setItem(hX,JSON.stringify(Y)),K1="\u5DF2\u4FDD\u5B58\u5230\u672C\u673A"}catch{K1="\u5B58\u50A8\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5BFC\u51FA JSON"}}function de(a,t=!1){let e=ea(Y);if(a(Y),t){Y.disconnected=[],Y.wireOverrides={},EA=null;let r=new Set(Ka(Y).nodes.map(s=>s.id));Y.states=Object.fromEntries(Object.entries(Y.states).filter(([s])=>r.has(s)))}JSON.stringify(e)!==JSON.stringify(Y)&&(Aa.push(e),Aa.length>50&&Aa.shift(),sn=[],Ge.trip=null,Y1(),ra())}function MA(a,t){R("#modal-title").textContent=a,R("#modal-body").innerHTML=t,R("#modal").showModal(),Ye()}function kU(a,t,e,r){R(a).onchange=s=>{let n=s.target.valueAsNumber;if(!Number.isFinite(n)||n<t||n>e){pe(`\u8BF7\u8F93\u5165 ${t} \u81F3 ${e} \u4E4B\u95F4\u7684\u6570\u503C`),As();return}r(n)}}function es(){return Y.circuits.find(a=>a.id===je)||kt.nodes.find(a=>a.id===je)?.circuit}function KU(a){let t=ts.circuits[a.id];return t.phasePresent&&!t.phaseOk?"\u7F3A\u76F8 \xB7 \u90E8\u5206\u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.neutralOk?"\u7F3A N \xB7 \u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.peOk?"PE \u65AD\u5F00 \xB7 \u4ECD\u5E26\u7535":Ge.trip===a.id?"\u6A21\u62DF\u8DF3\u95F8":t.powered?"\u6B63\u5E38\u4F9B\u7535":"\u672A\u5F62\u6210\u6B63\u5E38\u4F9B\u7535"}function VA(a){je=a,EA=null,As(),UA(),rs(),WA(),Ye()}function bX(a){let t=Xe.wires.find(e=>e.id===a);t&&(t.circuit&&(je=t.circuit),EA=a,Ke=!1,As(),rs(),WA(),Ye())}function GU(){return{selected:kt.nodes.some(a=>a.id===je)?je:es()?.id||je,wireMode:vX,door:Bo,exploded:cr,explodeScope,explodeAmount:1,isolate:Ke,sim:Ge}}function CX(a){je=a,EA=null,Ke=!0,As(),UA(),WA(),Ye()}function WA(){let a=kt.nodes.find(e=>e.id===je)||kt.nodes.find(e=>e.circuit?.id===je);if(Ke&&(!a||a.overflow)&&(Ke=!1),R("#inspect-only").disabled=!a||!!a.overflow,R("#inspect-only").classList.toggle("active",Ke),R("#explode").classList.toggle("active",cr),R("#wire-mode").disabled=false,R(".canvas-wrap").classList.toggle("is-isolated",Ke),Ke&&a)R("#model-title").textContent=a.product.name,R("#model-dimensions").textContent=`${a.product.width} \xD7 ${a.product.height} \xD7 ${a.product.depth} mm \xB7 ${a.product.brand}`,R("#scope-label").textContent=`${a.id} \xB7 \u5355\u4EF6\u68C0\u89C6`;else{R("#model-title").textContent=kt.box.name,R("#model-dimensions").textContent=`\u7BB1\u4F53 ${kt.box.width} \xD7 ${kt.box.height} \xD7 ${kt.box.depth} mm \xB7 ${kt.box.rows} \u6392 / ${kt.box.slots}P \xB7 ${kt.box.slots*18} mm`;let e=kt.nodes.filter(r=>r.overflow).length;R("#scope-label").textContent=e?`${e} \u4E2A\u7EC4\u4EF6\u672A\u88C5\u5165 \xB7 \u5BB9\u91CF\u4E0D\u8DB3`:cr?`\u5206\u5C42\u62C6\u89E3 \xB7 100%`:`${kt.nodes.length} \u4E2A\u7EC4\u4EF6 \xB7 \u6574\u67DC`}let t=JSON.stringify(kt.nodes.map(e=>[e.id,e.label,qt?.thumbnails.key(e.product)||e.product,e.overflow]));R("#parts-scroll").dataset.key!==t&&(R("#parts-scroll").dataset.key=t,R("#parts-scroll").innerHTML=kt.nodes.filter(e=>!e.overflow).map(e=>`<button class="part-tile" data-part="${e.id}" title="${it(e.id+" \xB7 "+e.label)}" aria-label="\u68C0\u89C6 ${it(e.id+" "+e.label)}"><img data-thumb="${it(e.product.id)}" alt="${it(e.label)}" decoding="async"><span>${e.id}</span></button>`).join(""),document.querySelectorAll("[data-part]").forEach(e=>e.onclick=()=>CX(e.dataset.part))),document.querySelectorAll("[data-part]").forEach(e=>e.classList.toggle("active",e.dataset.part===a?.id)),R("#part-caption").textContent=a?`${a.id} \xB7 ${a.label}`:"\u7EC4\u4EF6\u68C0\u89C6",qt?.build(Xe,Y,ts,GU()),xX()}function fillCabinetSelect(a){let t=allCabinets(a),e=[["\u739B\u5FB7\u514B",t.filter(r=>r.brand==="\u739B\u5FB7\u514B"||["MH144","Q120","Q96"].includes(r.id))],["\u901A\u7528\u4F30\u7B97",t.filter(r=>r.brand==="\u901A\u7528"||r.estimated&&!r.custom)],["\u81ea\u5b9a\u4e49",t.filter(r=>r.custom)]],r="";for(let[s,n]of e){if(!n.length)continue;r+=`<optgroup label="${it(s)}">`;for(let o of n)r+=`<option value="${it(o.id)}" ${o.id===a.cabinet?"selected":""}>${it(o.name)}${o.estimated?" \xB7 \u4F30\u7B97":""}</option>`;r+="</optgroup>"}R("#cabinet").innerHTML=r}function openCustomCabinetDialog(){let a={rows:2,slots:24,depth:120,mount:"\u660e\u88c5"};MA("\u81ea\u5b9a\u4e49\u7bb1\u4f53",`
     <p>\u6309\u901a\u7528\u4f30\u7b97\u516c\u5f0f\u751f\u6210\u7bb1\u4f53\uff08\u6392\u8ddd 150 mm\uff09\uff1b\u987b\u4ee5\u6240\u9009\u5382\u5bb6\u56fe\u7eb8\u4e3a\u51c6\uff0c\u4e0d\u5f97\u76f4\u63a5\u7528\u4e8e\u65bd\u5de5\u3002</p>
@@ -186,12 +198,13 @@ function openDesignTemplatesDialog(){let user=listUserDesignTemplates();let rows
 function openSaveAsTemplateDialog(){MA("\u5b58\u4e3a\u8bbe\u5907\u6a21\u677f",`<p>\u4fdd\u5b58\u5f53\u524d\u7bb1\u4f53\u3001\u603b\u5f00/SPD\u3001\u81ea\u5b9a\u4e49\u578b\u53f7\u4e0e ${Y.circuits.length} \u6761\u56de\u8def\u8bbe\u5907\uff08\u4e0d\u5305\u542b\u672a\u5206\u914d\u6e90\u8868\u8d1f\u8377\uff09\u3002</p>${Bt("\u6a21\u677f\u540d\u79f0",`<input id="tpl-name" maxlength="80" value="${it(Y.name+" \u6a21\u677f")}">`)}<button class="btn primary" id="tpl-save">\u4fdd\u5b58\u5230\u672c\u673a</button>`);R("#tpl-save").onclick=()=>{try{let name=R("#tpl-name").value;saveUserDesignTemplate(Y,name);R("#modal").close();pe("\u5df2\u4fdd\u5b58\u6a21\u677f\uff1a"+name.trim())}catch(err){pe(err.message||String(err))}}}
 function moduleAddressFields(m){
   const mode=moduleAddressMode(m);
-  return Bt('备注名称',`<input id="insp-display-name" data-display-name="${it(m.id)}" value="${it(m.displayName||'')}" maxlength="40" placeholder="例如：客厅灯光网关">`)+Bt('地址类型',`<select id="insp-address-mode" data-address-mode="${it(m.id)}">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],mode)}</select>`)+
+  return pduFields(Me(Y,m.productId),m)+networkSwitchFields(Me(Y,m.productId),m)+Bt('备注名称',`<input id="insp-display-name" data-display-name="${it(m.id)}" value="${it(m.displayName||'')}" maxlength="40" placeholder="例如：客厅灯光网关">`)+Bt('地址类型',`<select id="insp-address-mode" data-address-mode="${it(m.id)}">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],mode)}</select>`)+
     '<p id="address-mode-error" role="alert" style="color:#bf3030;font-size:11px"></p>'+
     (['id','both'].includes(mode)?Bt('模块 ID（十六进制）',`<input id="insp-hardware-id" data-hardware-id="${it(m.id)}" value="${it(m.hardwareId||'')}" maxlength="2" placeholder="01 / 0E" aria-describedby="hardware-id-error">`)+'<p id="hardware-id-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'')+
     (['ip','both'].includes(mode)?Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(m.id)}" value="${it(m.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)+'<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'');
 }
 function ra(){
+  mountOptionalFeatures({root:R('#optional-features'),getDesign:()=>Y,getAssembly:()=>kt,getNet:()=>Xe,products:()=>allProducts(Y),resolve:id=>Me(Y,id),commit:de,open:MA,close:()=>R('#modal').close(),select:VA,toast:pe});
   if(!R('#explode-scope')){
     const scope=document.createElement('select');scope.id='explode-scope';
     scope.setAttribute('aria-label','拆解范围');scope.title='拆解范围';
@@ -261,6 +274,16 @@ function ra(){
       renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect,onSaved:()=>{R('#modal').close();pe('接线已保存');}});
     });
     R('#inspector').addEventListener('change',event=>{
+      const pduField=event.target.closest('[data-pdu-orientation],[data-pdu-size],[data-pdu-outlet]');
+      if(pduField){
+        const id=pduField.dataset.pduModule||pduField.dataset.pduOrientation,m=Y.modules.find(m=>m.id===id);
+        if(m)try{const settings=readPduFields(R('#inspector'),Me(Y,m.productId));de(d=>Object.assign(d.modules.find(m=>m.id===id),settings));}catch(error){pe(error.message);}
+        return;
+      }
+      const orientation=event.target.closest('[data-switch-orientation]');
+      if(orientation){de(d=>{const m=d.modules.find(m=>m.id===orientation.dataset.switchOrientation);if(m)m.switchOrientation=orientation.value;});return;}
+      const portLabel=event.target.closest('[data-switch-port]');
+      if(portLabel){de(d=>{const m=d.modules.find(m=>m.id===portLabel.dataset.switchModule);if(m){m.switchPortLabels={...m.switchPortLabels,[portLabel.dataset.switchPort]:portLabel.value.trim().slice(0,24)};}});return;}
       const nameInput=event.target.closest('[data-display-name]');
       if(nameInput){de(d=>{d.modules.find(m=>m.id===nameInput.dataset.displayName).displayName=nameInput.value.trim().slice(0,40)});return}
       const modeInput=event.target.closest('[data-address-mode]');
@@ -297,11 +320,11 @@ function ra(){
   if(isSimpleMode(Y)&&BA==="audit") BA="assembly";
   (document.documentElement.dataset.v5="1",window.__V5_BRIDGED__=1,window.__PANEL_STATE__={design:()=>Y,assembly:()=>kt,net:()=>Xe,issues:()=>Je,toast:pe,recompute:ra,studio:()=>qt,uiMode:()=>getUiMode(Y)},(()=>{try{mountV5Bridge({getDesign:()=>Y,getAssembly:()=>kt,getNet:()=>Xe,getIssues:()=>Je,toast:pe,persist:Y1,refresh:ra,selectCircuit:VA,screenshot:()=>qt?.screenshot()||null,standaloneHtml:standaloneHtmlString})}catch(err){document.documentElement.dataset.v5err=String(err&&err.message||err)}})()),R("#project-title").textContent=Y.name,R("#saved").textContent=K1,R("#supply").value=Y.supply,fillCabinetSelect(Y);{let sb=R("#source-badge-text");if(sb)sb.textContent=isSimpleMode(Y)?`${(Y.modules||[]).length} 个模块 · ${Y.circuits.length} 条回路`:`${(Y.loads||[]).filter(l=>!l.metadata).length} \u6761\u6e90\u8bb0\u5f55 \xB7 ${Y.circuits.length} \u56de\u8def`;}let a=kt.box.rows*kt.box.slots;R("#capacity").textContent=`${kt.modules} / ${a} M`,R("#capacity-bar").style.width=Math.min(100,kt.modules/a*100)+"%",R("#model-title").textContent=kt.box.name,R("#model-dimensions").textContent=`\u7BB1\u4F53 ${kt.box.width} \xD7 ${kt.box.height} \xD7 ${kt.box.depth} mm \xB7 ${kt.box.rows} \u6392 / ${kt.box.slots}P \xB7 ${kt.box.slots*18} mm`;let t=kt.nodes.filter(r=>r.overflow).length;R("#scope-label").textContent=`${Y.circuits.length} \u56DE\u8DEF \xB7 ${t?t+" \u4E2A\u5668\u4EF6\u672A\u88C5\u5165":"\u9ED1\u8FB9\u7070\u73BB\u7483"}`,R("#issue-count").textContent=`${Je.filter(r=>r.level==="error").length} \u9879\u9700\u4FEE\u6B63 \xB7 ${Je.filter(r=>r.level!=="error").length} \u9879\u5F85\u6838`,R("#footer-wiring").textContent=`${Xe.wires.filter(r=>r.connected).length} / ${Xe.wires.length} \u6761\u8FDE\u63A5 \xB7 N / PE \u5206\u79BB`,R("#undo").disabled=!Aa.length,R("#redo").disabled=!sn.length;let e=W1(Y,Y.circuits,Y.demand);R("#phase-values")&&(R("#phase-values").innerHTML=Qe.map(r=>`<div><div class="phase-value-head"><span style="color:${Ue[r]}">${r}</span><span>\u9700\u7528</span><strong class="${e[r]>Y.mainAmps?"error":""}">${e[r].toFixed(1)} A</strong></div><div class="phase-track"><i style="width:${Math.min(100,e[r]/Y.mainAmps*100)}%;background:${Ue[r]}"></i></div></div>`).join(""));R("#power")&&(R("#power").checked=Ge.power);R("#live-count")&&(R("#live-count").textContent=`${ts.live} / ${Y.circuits.length} \u56DE\u8DEF`);renderProtectSchematic();UA(),As(),rs(),WA(),Ye()}
 function renderProtectSchematic(){const el=R("#protect-schematic");if(el){el.hidden=true;el.innerHTML="";}}
-function UA(){document.querySelectorAll("[data-left]").forEach(t=>t.classList.toggle("active",t.dataset.left===pr));let a=mX.toLowerCase();if(R("#library-tools").hidden=pr!=="library",pr==="library"){let t=js(Y).filter(e=>(e.name+e.id+e.brand+gA(e)).toLowerCase().includes(a));R("#left-content").innerHTML=t.map(e=>`<div class="library-row">${an(e)}<div class="library-info"><strong>${it(e.name)}</strong><small>${it(e.brand)} \xB7 ${e.width} mm \xB7 ${e.modules} M</small><small>${it(gA(e))}${e.custom?" \xB7 \u7528\u6237\u5F55\u5165":e.historical?" \xB7 \u5386\u53F2\u76EE\u5F55":""}</small></div><div class="library-actions"><button class="ib" data-install="${e.id}" title="\u88C5\u5165\u6B64\u578B\u53F7" aria-label="\u88C5\u5165${it(e.name)}">${Ut("plus")}</button><button class="ib" data-product="${e.id}" title="\u4EA7\u54C1\u53C2\u6570">${Ut("arrow-up-right")}</button></div></div>`).join("")||'<p class="empty" style="padding:15px">\u65E0\u5339\u914D\u4EA7\u54C1</p>',document.querySelectorAll("[data-product]").forEach(e=>e.onclick=()=>Uo(e.dataset.product)),document.querySelectorAll("[data-install]").forEach(e=>e.onclick=()=>PX(e.dataset.install))}else{let t=allGroupsOf().map(e=>{let r=circuitsOfGroup(e.id).filter(s=>!a||(s.name+s.id+s.path).toLowerCase().includes(a));return r.length?`<button class="group-heading" data-group="${e.id}">${Ut(An.has(e.id)&&!a?"chevron-right":"chevron-down")}${Ut(e.icon)}${e.name}<small>${r.length}</small></button>`+(An.has(e.id)&&!a?"":r.map(s=>`<button class="tree-item ${es()?.id===s.id?"active":""}" data-circuit="${s.id}">
+function UA(){document.querySelectorAll("[data-left]").forEach(t=>t.classList.toggle("active",t.dataset.left===pr));let a=mX.toLowerCase();if(R("#library-tools").hidden=pr!=="library",pr==="library"){let t=js(Y).filter(e=>(e.name+e.id+e.brand+gA(e)+(e.searchAliases||"")).toLowerCase().includes(a));R("#left-content").innerHTML=t.map(e=>`<div class="library-row">${an(e)}<div class="library-info"><strong>${it(e.name)}</strong><small>${it(e.brand)} \xB7 ${e.width} mm \xB7 ${e.modules} M</small><small>${it(gA(e))}${e.custom?" \xB7 \u7528\u6237\u5F55\u5165":e.historical?" \xB7 \u5386\u53F2\u76EE\u5F55":""}</small></div><div class="library-actions"><button class="ib" data-install="${e.id}" title="\u88C5\u5165\u6B64\u578B\u53F7" aria-label="\u88C5\u5165${it(e.name)}">${Ut("plus")}</button><button class="ib" data-product="${e.id}" title="\u4EA7\u54C1\u53C2\u6570">${Ut("arrow-up-right")}</button></div></div>`).join("")||'<p class="empty" style="padding:15px">\u65E0\u5339\u914D\u4EA7\u54C1</p>',document.querySelectorAll("[data-product]").forEach(e=>e.onclick=()=>Uo(e.dataset.product)),document.querySelectorAll("[data-install]").forEach(e=>e.onclick=()=>PX(e.dataset.install))}else{let t=allGroupsOf().map(e=>{let r=circuitsOfGroup(e.id).filter(s=>!a||(s.name+s.id+s.path).toLowerCase().includes(a));return r.length?`<button class="group-heading" data-group="${e.id}">${Ut(An.has(e.id)&&!a?"chevron-right":"chevron-down")}${Ut(e.icon)}${e.name}<small>${r.length}</small></button>`+(An.has(e.id)&&!a?"":r.map(s=>`<button class="tree-item ${es()?.id===s.id?"active":""}" data-circuit="${s.id}">
           <i class="dot ${Je.some(n=>n.circuit===s.id&&n.level==="error")?"error":ts.circuits[s.id]?.powered?"":"off"}"></i><span class="name">${it(s.name)}</span><span class="phase" style="color:${Ue[s.phase]||"#7b8c82"}">${s.voltage===380?"3\u03A6":Y.supply==="single"?"L1":s.phase}</span></button>`).join("")):""}).join("");R("#left-content").innerHTML=`<button class="group-heading" id="select-main">${Ut("git-branch")}\u603B\u5F00 <small>${Y.includeMain?Y.mainAmps+"A \xB7 \u6682\u5B9A":"\u672A\u88C5\u5165"}</small></button>${t}<div class="side-foot"><button id="manage-modules">${Ut("cpu")}共享模块 ${(Y.modules||[]).length}</button><button id="add-from-library">${Ut("plus")}从器件库增加设备</button>${ta(Y).length?`<p class="condition error">${ta(Y).length} \u6761\u8D1F\u8377\u5F85\u91CD\u65B0\u5206\u914D</p>`:""}</div>`,R("#select-main").onclick=()=>VA("Q0"),R("#manage-modules")&&(R("#manage-modules").onclick=()=>openModuleManager()),R("#add-from-library").onclick=()=>{pr="library",UA()},document.querySelectorAll("[data-group]").forEach(e=>e.onclick=()=>{An.has(e.dataset.group)?An.delete(e.dataset.group):An.add(e.dataset.group),UA(),Ye()}),document.querySelectorAll("[data-circuit]").forEach(e=>e.onclick=()=>VA(e.dataset.circuit))}Ye()}
 function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.maxWire)?`${a.minWire}\u2013${a.maxWire} mm\xB2`:'\u5F85\u6838';return`<div class="spec-row"><span>\u8BA2\u5355\u53F7</span><strong>${it(gA(a))}</strong></div><div class="spec-row"><span>\u54C1\u724C / \u578B\u53F7</span><strong>${it(a.brand)}<br>${it(a.name)}</strong></div>
-  <div class="spec-row"><span>\u5B9E\u9645\u5BBD\u5EA6 / \u5360\u4F4D</span><strong>${a.width} mm / ${a.modules} M</strong></div>
-  <div class="spec-row"><span>\u989D\u5B9A\u7535\u6D41</span><strong>${a.amps===null?"\u4E0D\u9002\u7528 \xB7 \u975E\u8D1F\u8F7D\u4E32\u8054\u5668\u4EF6":a.amps+" A"}</strong></div>
+  <div class="spec-row"><span>${a.outletCount?"建模宽度 / 占位":"\u5B9E\u9645\u5BBD\u5EA6 / \u5360\u4F4D"}</span><strong>${a.width} mm / ${a.modules} M</strong></div>
+  <div class="spec-row"><span>\u989D\u5B9A\u7535\u6D41</span><strong>${a.outletCount&&a.amps===null?"待核":a.amps===null?"\u4E0D\u9002\u7528 \xB7 \u975E\u8D1F\u8F7D\u4E32\u8054\u5668\u4EF6":a.amps+" A"}</strong></div>
   ${a.residual?`<div class="spec-row"><span>\u5269\u4F59\u7535\u6D41\u4FDD\u62A4</span><strong>${a.rcdType} \xB7 ${a.residual} mA</strong></div>`:""}
   <div class="spec-row"><span>\u94DC\u786C\u7EBF\u7AEF\u5B50\u8303\u56F4</span><strong>${wireRange}</strong></div>
   ${a.icn?`<div class="spec-row"><span>Icn</span><strong>${a.icn} kA</strong></div>`:""}
@@ -565,15 +588,16 @@ function openModuleDialog(product, existing){
   const feedOpts=[["shared","共用馈电（模块总进线）"],["perChannel","每路馈电"],["none","无强电馈电（总线/自取电）"]];
   const circuitOpts=[["","— 未指定 —"],...Y.circuits.map(c=>[c.id,c.id+" "+c.name])];
   const isTerm=product.kind==="terminal";
-  MA(editing?"编辑模块 "+id:isTerm?"装入菲尼克斯端子":"装入智能模块",`
+  MA(editing?"编辑模块 "+id:product.outletCount?"装入PDU":isTerm?"装入菲尼克斯端子":product.networkPorts?(product.poe?"装入PoE网关":"装入交换机"):"装入智能模块",`
     <p>${it(product.brand)} · ${it(product.name)} · ${product.channels?product.channels+" 路 · ":""}${product.width!=null?product.width+" mm / "+product.modules+" M":"宽度待核"}</p>
+    ${product.networkPorts?`<p class="condition">${it(product.note)}</p>`:''}
     ${Bt("模块名称",`<input id="mod-label" maxlength="40" value="${it(label)}">`)}
     ${Bt('备注名称',`<input id="mod-display-name" maxlength="40" placeholder="例如：客厅灯光网关" value="${it(existing?.displayName||'')}">`)}
     ${Bt('地址类型',`<select id="mod-address-mode">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],moduleAddressMode(existing||{}))}</select>`)}
     <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" aria-describedby="mod-id-error" value="${it(existing?.hardwareId||'')}">`)}<p id="mod-id-error" role="alert" style="color:#bf3030" hidden></p></div>
     <div id="mod-ip-field">${Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`)}</div>
-    ${isTerm?"":Bt("对应支路空开（一对一）",`<select id="mod-protect">${re(breakerOptions(id),protectId||"")}</select>`)}
-    <div class="${simple||isTerm?"full-only":""}">
+    ${isTerm||product.networkPorts||product.outletCount?"":Bt("对应支路空开（一对一）",`<select id="mod-protect">${re(breakerOptions(id),protectId||"")}</select>`)}
+    <div style="${product.networkPorts||product.outletCount?"display:none":""}" class="${simple||isTerm?"full-only":""}">
       <div class="field-grid">
         ${Bt("总线",`<select id="mod-bus">${re(busOpts,busId||"")}</select>`)}
         ${Bt("馈电方式",`<select id="mod-feed">${re(feedOpts,feed)}</select>`)}
@@ -581,12 +605,14 @@ function openModuleDialog(product, existing){
       ${Bt("取电回路（共用馈电时）",`<select id="mod-feed-c">${re(circuitOpts,feedCircuitId||"")}</select>`)}
     </div>
     <div id="mod-channels">${channelAssignHtml(product, channels, channelLabels, channelTerminals)}</div>
+    ${networkSwitchFields(product,existing||{id})}
+    ${pduFields(product,existing||{id})}
     ${Bt("安装位置",`<select id="mod-pos">${re([["auto","自动顺延"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],posKey)}</select>`)}
-    <p class="lib-preview">${isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":simple?"每个模块对应一个支路空开；总空开为上游，不参与模块分配。未指定时按安装顺序对应。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
+    <p class="lib-preview">${product.outletCount?"PDU用支架固定，模位为安装占位；所接设备文字用于标识，不生成未经核实的电气连线。":product.networkPorts?(product.powerInput==="ac-inlet"?"网络端口不生成 PoE 或市电接线；本机为内置交流电源，请预留后部电源线及接地空间。":(product.poe?"本机支持PoE供电；当前模型显示接口与备注，不模拟PoE链路。另行预留54V DC / 2.4A外置适配器空间。":"网络端口不生成 PoE 或市电接线；请另行预留外置 5V DC / 1A 适配器空间。")):isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":simple?"每个模块对应一个支路空开；总空开为上游，不参与模块分配。未指定时按安装顺序对应。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
     <p id="mod-save-error" role="alert" style="color:#bf3030" hidden></p>
     <div class="field-grid" style="margin-top:8px">
-      ${simple||isTerm?"":`<button class="btn" type="button" id="mod-suggest-smart">建议创建 C-SMART 取电回路</button>`}
-      <button class="btn primary" type="button" id="mod-save">${editing?"保存模块":"装入模块"}</button>
+      ${simple||isTerm||product.networkPorts||product.outletCount?"":`<button class="btn" type="button" id="mod-suggest-smart">建议创建 C-SMART 取电回路</button>`}
+      <button class="btn primary" type="button" id="mod-save">${editing?"保存模块":product.outletCount?"装入PDU":product.networkPorts?(product.poe?"装入PoE网关":"装入交换机"):"装入模块"}</button>
     </div>`);
   const feedEl=R("#mod-feed"), feedC=R("#mod-feed-c");
   rememberInstallPosition(R('#mod-pos'),positionKind);
@@ -648,13 +674,15 @@ function openModuleDialog(product, existing){
       const addressMode=R('#mod-address-mode').value;
       const hardwareId=['id','both'].includes(addressMode)?validateHardwareId(Y,id,R('#mod-hardware-id').value):R('#mod-hardware-id').value;
       const mod=normalizeModule({
+        ...(product.networkPorts?readNetworkSwitchFields(R('#modal-body'),product):{}),
+        ...(product.outletCount?readPduFields(R('#modal-body'),product):{}),
         displayName:R('#mod-display-name').value,
         addressMode,
         ipAddress: ['ip','both'].includes(addressMode)?validateIpAddress(R('#mod-ip-address').value):R('#mod-ip-address').value,
         hardwareId,
         terminalConnections: existing?.terminalConnections,
-        id, productId:product.id, label:nextLabel, busId:nextBus||null,
-        feed:simple||isTerm?"none":nextFeed, feedCircuitId:!simple&&!isTerm&&nextFeed==="shared"?nextFeedC:null,
+        id, productId:product.id, label:nextLabel, busId:product.networkPorts||product.outletCount?null:nextBus||null,
+        feed:simple||isTerm||product.networkPorts||product.outletCount?"none":nextFeed, feedCircuitId:!simple&&!isTerm&&!product.networkPorts&&!product.outletCount&&nextFeed==="shared"?nextFeedC:null,
         channels:emptyChannels(product.channels||0, simple||isTerm?channels:nextCh),
         channelLabels:emptyChannelLabels(product.channels||0, nextLabs),
         channelTerminals:nextTerms,

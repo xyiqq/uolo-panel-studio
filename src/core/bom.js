@@ -203,13 +203,13 @@ export function buildBom(design, assembly, net) {
   // 总线电缆（若 design.buses 存在）
   for (const b of design?.buses || []) {
     if (b.cableMeters != null && b.cableMeters > 0) {
-      const key = `bus|${b.type || b.id || "bus"}`;
+      const key = `bus|${b.type || b.id || "bus"}|${b.section??""}|${b.cableSpec||""}`;
       const previous=wireMap.get(key);
       wireMap.set(key, {
         section: b.section || "总线",
         color: b.type || "总线",
         meters: (previous?.meters||0)+Number(b.cableMeters),
-        note:'总线电缆手动填写长度',
+        note:'总线电缆手动填写长度'+(b.cableSpec?' · '+b.cableSpec:''),
       });
     }
   }
