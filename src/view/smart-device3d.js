@@ -3,6 +3,8 @@
  * 面板纹理按真实贴图宽高比生成高分辨率横版，避免竖图画布被拉糊。
  */
 import { paintModuleFace, moduleFaceSize, faceTextureSize } from "./module-face.js";
+import { networkSwitchPortLayout } from './network-switch-layout.js';
+import { buildPduDevice } from './pdu-device3d.js';
 import { rA, pA, Is, ye, sr, Yt, rr, THREE } from "./three-shim.js";
 
 export const KIND_BODY = {
@@ -121,6 +123,8 @@ function makeFaceTexture(kit, product, faceWmm, faceHmm) {
  * @param {string} label
  */
 export function buildSmartDevice(kit, product, ports = [], label = "") {
+  if(product.outletCount)return buildPduDevice(kit,product,label,makeFaceTexture);
+  if (product.networkPorts) return buildNetworkSwitch(kit, product, label);
   const s = new pA();
   if (product.kind === "terminal") return buildTerminalDevice(kit, product, label);
   const w = Math.max(16, Number(product.width) || (Number(product.modules) || 2) * 18);
@@ -207,6 +211,87 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
 
   kit.batch(s);
   return { group: s, toggle, led };
+}
+
+/** 桌面交换机：保留真实 W/H/D，端口朝柜门，托板仅为安装示意。 */
+function buildNetworkSwitch(kit, product, label) {
+  const group=new pA(), w=product.width,h=product.networkPhysicalHeight||product.height,d=product.networkPhysicalDepth||product.depth;
+  const body='#3c3c3e',top='#515153',dual=product.networkPortRows===2,gateway=product.networkProfile==='eg210gpe-v2';
+  kit.cube(group,w,h,d,0,0,d/2+6,body,.6,.48);
+  kit.cube(group,w-1,.6,d-1,0,h/2,d/2+6,top,.2,.5);
+  // 官网机壳为平整顶盖、侧面通风，不沿用旧型号的顶盖散热槽。
+  for(let i=0;i<(dual?18:9);i++)for(const side of [-1,1])for(let row=0;row<(dual?3:1);row++){
+    kit.cube(group,.3,dual?2.3:6,1.8,side*(w/2+.1),dual?(row-1)*5:0,20+i*3.5,'#161619',.1);
+  }
+  for(const x of [-w/2+4,w/2-4])for(const y of [-h/2+3,h/2-3]) kit.screw(group,x,y,d+6.3,1);
+  for(const {x,y,number,name} of networkSwitchPortLayout(product)){
+    const frame=kit.cube(group,14.2,12.8,1.2,x,y,d+6.7,'#b7c5c8',.3,.2);
+    frame.userData.networkPort=number;
+    kit.cube(group,11.8,9.3,.6,x,y+.6,d+7.5,'#07141c',.2);
+    kit.cube(group,5,2.5,.6,x,y-4.6,d+7.6,'#07141c',.1);
+    for(let pin=0;pin<8;pin++) kit.cube(group,.42,3.2,.25,x-3.6+pin*1.02,y+2.2,d+7.9,'#cdb16d',.05,.25);
+    for(const side of [-1,1]) kit.cube(group,1.8,1,.4,x+side*5,y+5.8,d+7.6,side<0?'#658869':'#9c8956',.1);
+    kit.text(group,name||String(number),name?15:5,name?1.65:2,x,gateway?9.6:dual?(y>0?17:-17):-h/2+4,d+7.8,'#e2eeee',body);
+  }
+  kit.text(group,'Ruijie 锐捷',dual?25:20,3.1,-w/2+(dual?16:12),dual?h/2-3:-h/2+1.4,d+7.8,'#eeeeee',body);
+  kit.text(group,product.networkDeviceLabel||`${product.networkPorts}口交换机`,gateway?52:dual?44:23,dual?4:2.7,gateway?w*.25:dual?w*.28:w/2-14,dual?7:-h/2+1.4,d+7.8,'#eeeeee',body);
+  kit.cube(group,1.8,1.8,.4,-w/2+6,1,d+7,'#6c8c6e',.3);
+  kit.text(group,'Status',10,2,-w/2+7,5,d+7.8,'#eeeeee',body);
+  if(dual){
+    // ES116G-E：前部三模式拨码，后部IEC交流插口与接地柱。
+    kit.cube(group,6,3.5,1,-w/2+10,-10,d+7,'#18181a',.2);
+    kit.cube(group,1.8,3,1.3,-w/2+12,-10,d+7.7,'#bfc0c1',.1);
+    kit.cube(group,22,17,2,w/2-26,0,5,'#171719',2);
+    for(const [x,y] of [[-5,-3],[5,-3],[0,4]])kit.cube(group,1.4,4,1,w/2-26+x,y,3.5,'#b9b9b9',.1);
+    kit.screw(group,w/2-48,-8,5,2);
+  }else if(gateway){
+    // 前8个PoE口成组，另两个WAN/LAN口独立；复位孔在左侧，54V插口在后方。
+    const ports=networkSwitchPortLayout(product),left=ports[0].x-7.5,right=ports[7].x+7.5,mid=(left+right)/2;
+    for(const y of [-8,8])kit.cube(group,right-left,.5,.25,mid,y,d+7.6,'#c8b98b',.1);
+    for(const x of [left,right])kit.cube(group,.5,16,.25,x,0,d+7.6,'#c8b98b',.1);
+    kit.text(group,'PoE 110W',30,2.2,mid,-10.4,d+7.8,'#ddd1a4',body);
+    kit.cube(group,1.8,1.8,.5,-w/2+11,-5,d+7,'#141416',.8);
+    kit.text(group,'Reset',8,1.6,-w/2+11,-9,d+7.8,'#eeeeee',body);
+    kit.cube(group,7,7,1,w/2-12,0,5,'#141416',3);
+    kit.screw(group,w/2-5,7,d/2,1.5);
+  }else{
+    // ES105GD / ES108GD：DC接口在前面板右侧。
+    kit.cube(group,6,6,1,w/2-8,1,d+7,'#141416',2.8);
+    kit.cube(group,1.4,1.4,1,w/2-8,1,d+7.6,'#9d9d9d',.6);
+    kit.text(group,'DC 5V',12,2,w/2-9,8,d+7.8,'#eeeeee',body);
+  }
+  kit.batch(group);
+  const outer=new pA(),orientation=product.switchOrientation||'front',turned=orientation!=='front';
+  if(turned){
+    const pivot=new pA();
+    group.position.z=-d/2-6;
+    pivot.add(group);pivot.rotation.x=orientation==='up'?-Math.PI/2:Math.PI/2;
+    pivot.position.z=h/2+6;outer.add(pivot);
+  }else outer.add(group);
+  // 托板留在柜内安装平面，不随机身翻到前方遮住端口标签。
+  const installedH=turned?d:h,installedD=turned?h:d;
+  const tray=kit.cube(outer,w,2,installedD+2,0,-installedH/2-3,installedD/2+6,'#9ca9aa',.2,.4);
+  tray.userData.mountingTray=true;
+  const hasNote=!!product.displayName,hasPortLabels=Object.values(product.switchPortLabels||{}).some(Boolean);
+  const addSurface=(tex,width,height,offsetY,role)=>{
+    const plate=new pA();kit.decal(plate,tex,width,height,0,offsetY,0);
+    if(turned)plate.position.set(0,0,h+7);
+    else {plate.rotation.x=-Math.PI/2;plate.position.set(0,h/2+1,d/2+6);}
+    plate.userData[role]=true;outer.add(plate);
+  };
+  if(hasPortLabels){
+    const panelW=w-10,panelH=d-12-(hasNote?14:0);
+    const tex=makeFaceTexture(kit,{...product,faceRole:'network-port-labels'},panelW,panelH);
+    addSurface(tex,panelW,panelH,hasNote?-7:0,'networkPortLabels');
+  }
+  if(hasNote){
+    const noteW=w-10,noteH=10;
+    const tex=makeFaceTexture(kit,{...product,faceRole:'module-note'},noteW,noteH);
+    addSurface(tex,noteW,noteH,(d-12-noteH)/2,'networkDisplayName');
+  }
+  if(label)kit.text(outer,label,w,6,0,-(turned?d:h)/2-10,(turned?h:d)+8,'#dbe4e0','#1c292f');
+  outer.userData.switchOrientation=orientation;
+  return {group:outer,toggle:null,led:null};
 }
 
 export function isSmartVisual(product) {

@@ -8,9 +8,13 @@ import { TUYA_DIN_PRODUCTS } from "./smart-tuya-din.js";
 import { MEANWELL_PSU_PRODUCTS } from "./psu-meanwell.js";
 import { DALI_PSU_PRODUCTS } from "./psu-dali.js";
 import { PHOENIX_TERMINAL_PRODUCTS } from "./terminal-phoenix.js";
+import { NETWORK_SWITCH_PRODUCTS } from "./network-switches.js";
+import { BULL_PDU_PRODUCTS } from './pdu-bull.js';
 
 /** @type {object[]} */
 export const SMART_PRODUCTS = [
+  ...BULL_PDU_PRODUCTS,
+  ...NETWORK_SWITCH_PRODUCTS,
   ...CRESTRON_PRODUCTS,
   ...LUTRON_PRODUCTS,
   ...KNX_PRODUCTS,

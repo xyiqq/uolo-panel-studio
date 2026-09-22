@@ -1,4 +1,6 @@
 /** 装配模块的矢量原稿。SVG 与同步 Canvas 贴图共用图元，不依赖图片加载或网络。 */
+import { networkSwitchPortLayout } from './network-switch-layout.js';
+import {PDU_SOCKET_HOLES,socketHolePolygon} from './pdu-socket-layout.js';
 const FONT = 'Arial,Microsoft YaHei,sans-serif';
 const ACCENTS = { Crestron: '#76b8e4', Lutron: '#ceb67a', MDT: '#75b4db', ABB: '#df5347', 明纬: '#ddbb68', 涂鸦DIN: '#ed9470' };
 const NAMES = { relay: 'RELAY', dimmer: 'DIMMER', gateway: 'INTERFACE', psu: 'POWER', meter: 'METER', contactor: 'ACTUATOR', timer: 'TIMER', terminal: 'TERMINAL', mcb: 'MCB', rcbo: 'RCBO', rccb: 'RCCB', spd: 'SPD' };
@@ -38,6 +40,62 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     rect(0,0,w,h,'#23784f');
     text(p.displayName||'',w/2,h*.69,h*.6,'#ffffff',cw,'middle');
     return {width:W,height:H,w,h,shapes,kind,title:p.displayName||''};
+  }
+  if(p.faceRole==='pdu-outlet-label'){
+    rect(0,0,w,h,'#ecf3e8');rect(0,0,w*.12,h,'#23784f');
+    text(p.outletNumber,w*.06,h*.62,h*.48,'#fff',w*.11,'middle');
+    const label=String(p.outletText||'未指定'),chars=[...label],lines=[];
+    for(let i=0;i<chars.length;i+=12)lines.push(chars.slice(i,i+12).join(''));
+    const lh=h/(lines.length+1);
+    lines.forEach((line,i)=>text(line,w*.56,lh*(i+1)+lh*.2,Math.min(lh*.7,w*.82/Math.max(1,[...line].length)),'#243b30',w*.84,'middle'));
+    return {width:W,height:H,w,h,shapes,kind,title:`插位${p.outletNumber}：${label}`};
+  }
+  if(p.outletCount){
+    rect(0,0,w,h,'#354047');rect(0,0,w*.025,h,'#238daf');rect(w*.975,0,w*.025,h,'#238daf');
+    rect(w*.03,12,w*.08,h-24,'#2188a6');rect(w*.05,90,w*.04,110,'#3e8e66','#b7d8e1',2);
+    text('BULL',w*.07,50,18,'#fff',w*.075,'middle');
+    const cell=(w*.85)/p.outletCount;
+    for(let i=0;i<p.outletCount;i++){
+      const x=w*.12+(i+.5)*cell,pw=cell*.88;
+      rect(x-pw/2,20,pw,250,'#1e272d','#576268',3);
+      for(const hole of PDU_SOCKET_HOLES)shapes.push({tag:'polygon',points:socketHolePolygon(hole).map(v=>`${x+v.x*pw/37},${132-v.y*6.3}`).join(' '),fill:'#080e12'});
+      text(`${i+1} ${p.outletLabels?.[i+1]||'未指定'}`,x,251,15,'#c9e4c8',pw-4,'middle');
+    }
+    return {width:W,height:H,w,h,shapes,kind,title:`${p.outletCount}位PDU`};
+  }
+  if(p.faceRole==='network-port-labels'){
+    rect(0,0,w,h,'#e8eddf');
+    const columns=p.networkLabelColumns||Math.min(8,p.networkPorts),rows=Math.ceil(p.networkPorts/columns),cellW=w/columns,cellH=(h-42)/rows;
+    text(`${p.networkDeviceLabel||p.networkPorts+'口交换机'} · 网口信息${p.hardwareId?' · ID '+p.hardwareId:''}`,12,27,18,'#25493b',w-24);
+    for(let i=0;i<p.networkPorts;i++){
+      const x=(i%columns)*cellW,y=42+Math.floor(i/columns)*cellH;
+      rect(x+2,y+2,cellW-4,cellH-4,'#fafcf4','#8ea59a',2);
+      rect(x+3,y+3,cellW-6,22,'#23784f');
+      text(p.networkPortNames?.[i]||String(i+1),x+cellW/2,y+19,14,'#fff',cellW-8,'middle');
+      const label=String(p.switchPortLabels?.[i+1]||'—');
+      const chars=[...label],lines=[];for(let j=0;j<chars.length;j+=8)lines.push(chars.slice(j,j+8).join(''));
+      const lineHeight=Math.min(24,(cellH-30)/Math.max(1,lines.length));
+      lines.forEach((line,j)=>text(line,x+cellW/2,y+30+(j+.75)*lineHeight,Math.min(19,lineHeight*.8,(cellW-10)/Math.max(1,[...line].length)),'#233b31',cellW-10,'middle'));
+    }
+    return {width:W,height:H,w,h,shapes,kind,title:'交换机网口信息'};
+  }
+  if (p.networkPorts) {
+    rect(0,0,w,h,'#3c3c3e');rect(3,3,w-6,h-6,'none','#747478',3);
+    const dual=p.networkPortRows===2,kx=w/p.width,ky=h/p.height;
+    text('Ruijie 锐捷',12,dual?25:289,dual?17:20,'#eeeeee',w*.14);
+    text(p.networkDeviceLabel||`${p.networkPorts}口交换机`,w*.77,dual?80:289,18,'#eeeeee',w*.22);
+    circle(w*.045,140,4,'#78ab73');text('Status',w*.045,120,11,'#d4d4d5',w*.08,'middle');
+    for(const port of networkSwitchPortLayout(p)){
+      const x=(port.x+p.width/2-7)*kx,y=(p.height/2-port.y-6.4)*ky,pw=14*kx,ph=12.8*ky;
+      rect(x,y,pw,ph,'#bdc3c5','#e0e8e7',2);rect(x+pw*.08,y+ph*.09,pw*.84,ph*.7,'#0b1015');
+      rect(x+pw*.28,y+ph*.7,pw*.44,ph*.23,'#0b1015');
+      for(let pin=0;pin<8;pin++)rect(x+pw*.16+pin*pw*.09,y+ph*.12,pw*.04,ph*.24,'#bca979');
+      text(port.name||port.number,x+pw/2,dual?(port.y>0?40:282):257,port.name?9:dual?13:16,'#eeeeee',pw,'middle');
+    }
+    if(!dual&&p.networkProfile!=='eg210gpe-v2'){circle(w-8*kx,140,3*kx,'#141416','#8b8b8b');text('DC 5V',w-9*kx,75,13,'#eeeeee',w*.1,'middle');}
+    else if(p.networkProfile==='eg210gpe-v2'){text('PoE 110W',w*.39,40,16,'#e9c46a',w*.45,'middle');circle(w*.035,210,4,'#222222');text('Reset',w*.035,250,10,'#dddddd',w*.06,'middle');}
+    else {rect(w*.035,210,w*.025,18,'#151515');rect(w*.046,210,w*.007,18,'#bbbbbb');text('MODE',w*.048,255,9,'#dddddd',w*.06,'middle');}
+    return {width:W,height:H,w,h,shapes,kind,title:p.networkDeviceLabel||`${p.networkPorts}口交换机`};
   }
   rect(0,0,w,h,paper); rect(2,2,w-4,h-4,'none',edge,5); rect(pad,10,cw,4,accent);
   const model = String(p.name || p.sku || p.id || 'DIN MODULE');
@@ -128,6 +186,7 @@ export function paintModuleFace(ctx,width,height,product) {
     if(a.tag==='rect') ctx.roundRect(a.x,a.y,a.width,a.height,a.rx||0);
     if(a.tag==='circle') ctx.arc(a.cx,a.cy,a.r,0,2*Math.PI);
     if(a.tag==='line') { ctx.moveTo(a.x1,a.y1); ctx.lineTo(a.x2,a.y2); }
+    if(a.tag==='polygon') { const points=a.points.split(' ').map(pair=>pair.split(',').map(Number));points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath(); }
     if(a.tag==='text') { ctx.font=`${a['font-weight']} ${a['font-size']}px ${FONT}`; ctx.textAlign=a['text-anchor']==='middle'?'center':'left'; ctx.textBaseline='alphabetic'; ctx.fillText(a.text,a.x,a.y); }
     else { if(a.fill && a.fill!=='none')ctx.fill(); if(a.stroke && a.stroke!=='none')ctx.stroke(); }
   }
@@ -137,5 +196,6 @@ export function paintModuleFace(ctx,width,height,product) {
 /** 采用统一比例缩放，窄贴图也不会因分别钳制宽高而变形。 */
 export function faceTextureSize(width,height) {
   const scale=Math.min(20,3072/Math.max(width,height));
-  return {width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale))};
+  const textureHeight=Math.max(1,Math.floor(height*scale));
+  return {width:Math.max(1,Math.round(textureHeight*width/height)),height:textureHeight};
 }

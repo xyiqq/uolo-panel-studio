@@ -7,6 +7,8 @@ export function buildPortTemplates(product) {
   const add = (key, conductor, side, io, channel) => {
     ports.push({ key, conductor, side, io, ...(channel != null ? { channel } : {}) });
   };
+  // RJ45 不作为强电/KNX 总线端子，避免把交换机自动接入电气网络。
+  if (product?.networkPorts) return ports;
 
   if (["mcb", "rcbo", "rccb", "spd", "isolator", "changeover"].includes(kind)) {
     const poles = product.poles || 1;

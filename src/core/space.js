@@ -53,6 +53,8 @@ export function computeSpace(design, assembly, cabinets = []) {
   let modulesControl = 0;
   let unknownWidth = 0;
   let maxHeight = 0;
+  let maxSingleRowHeight = 0;
+  let maxPduWidth = 0;
   let maxDepth = 0;
   let heatW = 0;
   let heatUnknown = 0;
@@ -60,7 +62,8 @@ export function computeSpace(design, assembly, cabinets = []) {
   const nodes = assembly?.nodes || [];
   for (const node of nodes) {
     const product = node.product || {};
-    const mods = nodeModules(node, slotWidth);
+    const baseMods = nodeModules(node, slotWidth);
+    const mods = baseMods==null?null:baseMods*(product.outletCount?Math.max(1,Math.ceil(product.height/current.pitch)):1);
     if (mods == null) {
       unknownWidth += 1;
     } else if (nodeZone(node) === "control") {
@@ -69,6 +72,8 @@ export function computeSpace(design, assembly, cabinets = []) {
       modulesPower += mods;
     }
     if (Number.isFinite(product.height)) maxHeight = Math.max(maxHeight, product.height);
+    if(!product.outletCount||product.pduOrientation!=='vertical')maxSingleRowHeight=Math.max(maxSingleRowHeight,Number(product.height)||0);
+    if(product.outletCount)maxPduWidth=Math.max(maxPduWidth,product.width);
     if (Number.isFinite(product.depth)) maxDepth = Math.max(maxDepth, product.depth);
     if (product.heatW == null || !Number.isFinite(product.heatW)) heatUnknown += 1;
     else heatW += product.heatW;
@@ -76,9 +81,10 @@ export function computeSpace(design, assembly, cabinets = []) {
 
   const totalModules = modulesPower + modulesControl;
 
-  function rowsFor(slots) {
+  function rowsFor(slots,pitch=current.pitch) {
     const s = Math.max(1, slots || 24);
-    const rowsPower = Math.ceil((modulesPower * (1 + spare)) / s);
+    const pduRows=Math.max(0,...nodes.filter(n=>n.product?.outletCount).map(n=>Math.ceil(n.product.height/pitch)));
+    const rowsPower = Math.max(pduRows,Math.ceil((modulesPower * (1 + spare)) / s));
     const rowsControl =
       modulesControl > 0 ? Math.ceil((modulesControl * (1 + spare)) / s) : 0;
     return { rowsPower, rowsControl, rowsNeeded: rowsPower + rowsControl, slots: s };
@@ -98,12 +104,13 @@ export function computeSpace(design, assembly, cabinets = []) {
   const recommendations = (cabinets || [])
     .map((raw) => {
       const cab = normalizeCabinet(raw);
-      const need = rowsFor(cab.slots);
-      const clearanceOk = !maxHeight || cab.rowClearance >= maxHeight;
+      const need = rowsFor(cab.slots,cab.pitch);
+      const clearanceOk = !maxSingleRowHeight || cab.rowClearance >= maxSingleRowHeight;
       const depthOk = !maxDepth || cab.maxDeviceDepth >= maxDepth;
       const fits =
         cab.rows >= need.rowsNeeded &&
         cab.slots >= 1 &&
+        cab.slots*slotWidth >= maxPduWidth &&
         clearanceOk &&
         depthOk;
       const excess = cab.rows * cab.slots - totalModules;
