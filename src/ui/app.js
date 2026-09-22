@@ -1,4 +1,5 @@
 import { createIcons, icons } from "lucide";
+import { clearDevices } from "../core/clear-devices.js";
 import {
   eX, _s, $s, Ka, kA, AX, sX, aX, Me, gA, js, Co, ea, ta, fr, Mo, W1, N1, yo, ka,
   Ue, HA, Za, Qe, bA, Eo, Yr, _r, Js
@@ -97,6 +98,7 @@ var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"
       <button type="button" class="btn" id="design-templates" style="margin-top:8px;width:100%">${Ut("layout-template")} \u65b9\u6848\u6a21\u677f\u2026</button>
       <button type="button" class="btn" id="save-as-template" style="margin-top:8px;width:100%">${Ut("bookmark-plus")} \u5b58\u4e3a\u8bbe\u5907\u6a21\u677f</button>
       <button type="button" class="btn" id="manage-groups" style="margin-top:8px;width:100%">${Ut("shapes")} 逻辑分区…</button>
+      <button type="button" class="btn danger" id="clear-devices" style="margin-top:8px;width:100%">${Ut("trash-2")} 一键清空设备</button>
       <div class="stat-strip"><span>\u6A21\u6570\u5360\u7528</span><span id="capacity"></span></div><div class="progress"><i id="capacity-bar"></i></div>
       <div class="source-badge" id="source-badge">${Ut("sheet")}<span id="source-badge-text"></span></div>
     </section>
@@ -256,7 +258,7 @@ function ra(){
       const button=event.target.closest('[data-terminal-connect]');
       if(!button) return;
       MA('端子连接 '+button.dataset.terminalConnect,'');
-      renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect});
+      renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect,onSaved:()=>{R('#modal').close();pe('接线已保存');}});
     });
     R('#inspector').addEventListener('change',event=>{
       const nameInput=event.target.closest('[data-display-name]');
@@ -809,6 +811,21 @@ function writePosition(design,id,pos){
   design.positions&&typeof design.positions=="object"||(design.positions={});
   pos?design.positions[id]={row:pos.row,slot:pos.slot}:delete design.positions[id]
 }
+R("#clear-devices").onclick=()=>{
+  MA("清空全部设备",`<p>将移除全部空开、智能模块、端子、总开、SPD、零线排和地线排，并清除关联回路、总线、接线和安装位置。</p>
+    <p>保留项目名称、箱体配置、器件库和源表负荷。清空后可通过顶部「撤销」恢复。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" id="clear-devices-cancel">取消</button>
+      <button type="button" class="btn danger" id="clear-devices-confirm">确认清空全部设备</button>
+    </div>`);
+  R("#clear-devices-cancel").onclick=()=>R("#modal").close();
+  R("#clear-devices-confirm").onclick=()=>{
+    R("#modal").close();
+    je="Q0";EA=null;Ke=false;Ge={power:false,trip:null};
+    de(clearDevices,true);
+    pe("全部设备已清空，可通过顶部「撤销」恢复");
+  };
+};
 function cX(a){let t=kt.nodes.find(r=>r.id===a);if(!t)return;let e=t.circuit?.loadIds.length||0;MA("\u79FB\u9664\u88C5\u914D\u8BBE\u5907",`<p>${it(t.label)} \xB7 ${it(gA(t.product))}</p>
     <p>${t.role==="branch"?`\u5173\u8054\u7684 ${e} \u6761\u6E90\u8868\u8D1F\u8377\u4F1A\u4FDD\u7559\u4E3A\u5F85\u91CD\u65B0\u5206\u914D\uFF0C\u5173\u8054\u6F0F\u4FDD\u968F\u672C\u56DE\u8DEF\u4E00\u5E76\u79FB\u9664\u3002`:t.role==="main"?"\u79FB\u9664\u4E3B\u5F00\u540E\uFF0C\u672B\u7AEF\u4E0D\u518D\u63A5\u5165\u5E02\u7535\uFF0C\u62A5\u544A\u5C06\u663E\u793A\u7F3A\u5C11\u8FDB\u7EBF\u4FDD\u62A4\u3002":t.role==="module"?"将删除共享模块及其通道分配，关联回路保留。":["spd","spdBackup"].includes(t.role)?"SPD \u53CA\u5176\u540E\u5907\u4FDD\u62A4\u4F5C\u4E3A\u914D\u5957\u7EC4\u5408\u4E00\u5E76\u79FB\u9664\u3002":"\u4EC5\u79FB\u9664\u5173\u8054\u6F0F\u4FDD\uFF0C\u56DE\u8DEF\u548C\u6E90\u8868\u8D1F\u8377\u4FDD\u7559\uFF1B\u7F3A\u5C11\u6F0F\u4FDD\u5C06\u5217\u4E3A\u9700\u4FEE\u6B63\u3002"}</p>
     <button class="btn danger" id="remove-confirm">\u786E\u8BA4\u79FB\u9664</button>`),R("#remove-confirm").onclick=()=>{R("#modal").close(),de(r=>{

@@ -2,7 +2,7 @@ import {terminalRows, outputOptions, saveTerminalRows, terminalCsv, sequentialTe
 import {terminalConnectionSvg, esc} from '../view/terminal-connections.js';
 import '../styles/terminal-connections.css';
 
-export function renderTerminalConnections({root, design, resolve, commit, download, terminalId=null}) {
+export function renderTerminalConnections({root, design, resolve, commit, download, terminalId=null, onSaved}) {
   const rows = terminalRows(design,resolve), outputs = outputOptions(design,resolve);
   const options = (items,current) => items.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(current)?'selected':''}>${esc(t)}</option>`).join('');
   root.innerHTML = `<section class="terminal-editor"><div class="pane-head"><h2>端子连接</h2><div class="tools"><button class="btn" id="terminal-svg">下载 SVG</button><button class="btn" id="terminal-csv">接线 CSV</button><button class="btn primary" id="terminal-save">保存接线</button></div></div>
@@ -91,6 +91,7 @@ export function renderTerminalConnections({root, design, resolve, commit, downlo
       root.querySelectorAll('[data-batch-prompt]').forEach(el=>el.remove());
       status.classList.remove('error');
       root.querySelector('.terminal-status').textContent='接线已保存';
+      onSaved?.();
     } catch(e) { status.textContent=e.message; status.classList.add('error'); }
   };
   root.querySelector('#terminal-csv').onclick=()=>download('端子连接.csv',terminalCsv(read()),'text/csv;charset=utf-8');
