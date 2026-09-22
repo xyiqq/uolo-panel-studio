@@ -9,6 +9,9 @@ import { matchCircuit, productSku, findProduct } from "./domain.js";
 import { handoverReadme } from "./pack.js";
 import { buildChannelRows, channelRowsToCsv } from "./modules.js";
 import {terminalRows, terminalCsv} from './terminal-connections.js';
+import {buildDeliveryNet} from './delivery-net.js';
+import {buildBom} from './bom.js';
+import {applyLabelRules} from './labels.js';
 
 /** CSV 文本（BOM + CRLF） */
 export function toCsv(rows) {
@@ -44,7 +47,7 @@ export function wireRows(net, labels) {
   return [
     [
       "起点", "起点标签", "终点", "终点标签", "导体", "线类", "线段截面mm2",
-      "对应出箱截面mm2", "线材", "用途", "连接状态", "回路", "过载保护A", "待核条件",
+      "对应出箱截面mm2", "线材", "用途", "连接状态", "回路", "过载保护A", "待核条件", "线号", "长度类别",
     ],
     ...(net?.wires || []).map((w) => [
       w.from,
@@ -61,6 +64,8 @@ export function wireRows(net, labels) {
       w.circuit || "",
       w.protect || "",
       "短路、温升及现场条件仍待工程核验",
+      w.wireNo || labels?.wireTag?.(w) || w.tag || '',
+      w.lengthKind==='external'?'出箱':'箱内',
     ]),
   ];
 }
@@ -74,7 +79,7 @@ export function bomRows(bom) {
       i.priceReference ?? "",
     ]),
     ...(bom?.wires || []).map((w) => [
-      "线材", `${w.section} mm²`, w.color ? `${w.color}色导线` : "导线", "",
+      "线材", w.section==null?'截面待核':typeof w.section==='number'?`${w.section} mm²`:String(w.section), w.color ? `${w.color}色导线` : "导线", "",
       w.meters != null ? Number(w.meters).toFixed(2) : "", "m", w.note || "", "",
     ]),
   ];
@@ -87,6 +92,8 @@ export function bomRows(bom) {
  * @returns {Record<string,string>}
  */
 export function buildHandoverFiles(ctx = {}) {
+  const deliveryNet=buildDeliveryNet(ctx.design,ctx.net?.assembly,ctx.net);
+  ctx={...ctx,net:deliveryNet,labels:applyLabelRules(ctx.design,deliveryNet),bom:buildBom(ctx.design,deliveryNet.assembly,deliveryNet)};
   const { design, net, issues = [], bom, labels, pages = [], standaloneHtml } = ctx;
   const simple = (design?.uiMode || "simple") === "simple";
   const files = {};
@@ -100,6 +107,8 @@ export function buildHandoverFiles(ctx = {}) {
   );
   if (bom) files["物料清单.csv"] = toCsv(bomRows(bom));
   if (standaloneHtml) files["方案-独立HTML.html"] = standaloneHtml;
+  files["端子接线表.csv"] = toCsv(wireRows(net, labels));
+  if(net.wiringIssues.length) files['配线待核事项.json']=JSON.stringify(net.wiringIssues,null,2);
 
   if (!simple) {
     files["校核记录.json"] = JSON.stringify(
@@ -108,7 +117,6 @@ export function buildHandoverFiles(ctx = {}) {
       2,
     );
     files["回路计算.csv"] = toCsv(circuitRows(design, issues));
-    files["端子接线表.csv"] = toCsv(wireRows(net, labels));
   }
 
   pages.forEach((p, i) => {

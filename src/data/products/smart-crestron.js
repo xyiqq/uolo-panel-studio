@@ -1,6 +1,6 @@
 /**
- * Crestron DIN 系列起步目录。
- * 外形：官方产品页 / Spec Sheet「occupies N DIN module spaces」；电气额定仍为待核。
+ * Crestron DIN 系列目录。2026-09-21 官网复核，详见 docs/2026-09-21-Crestron官网参数核查.md。
+ * modules 为导轨预留模位，width 为实际机身宽度；二者不可混用。
  */
 import { makeSmartProduct } from "./_smart-factory.js";
 
@@ -22,9 +22,11 @@ export const CRESTRON_PRODUCTS = [
     sku: "DIN-AP4",
     kind: "gateway",
     zone: "control",
-    protocol: ["cresnet"],
-    powerInput: "LN",
+    protocol: ["cresnet", "poe"],
+    powerInput: "24vdc-or-poe",
     ...din(9, 91, 58),
+    width: 161,
+    note: "控制器由外部 24VDC 或 PoE 供电，不接市电 L/N；本机功耗 9.7W（不含 Cresnet 负载）。9M 为预留占位，机身宽 161mm。",
     source: {
       file: "DIN-AP4 Specifications",
       url: "https://docs.crestron.com/en-us/8559/Content/Topics/Specifications/DIN-AP4-Specifications.htm",
@@ -42,6 +44,9 @@ export const CRESTRON_PRODUCTS = [
     protocol: ["cresnet"],
     powerInput: "LN",
     ...din(9, 95, 60),
+    width: 159,
+    busConsumption: { value: 5.4, unit: "W" },
+    note: "8 路独立继电器及 8 路隔离数字输入；控制侧由 Cresnet 24VDC 供电，功耗 5.4W。负载侧每路：白炽灯 10A、荧光灯 5A、阻性 16A、240VAC 电机 0.5HP；不可把阻性额定用于所有负载。机身宽 159mm，预留 9M。",
     source: {
       file: "ss_DIN-8SW8-I",
       url: "https://www.crestron.com/getmedia/17f567f3-cda4-451b-8c80-bd543c6629f7/ss_DIN-8SW8-I",
@@ -60,11 +65,12 @@ export const CRESTRON_PRODUCTS = [
     powerInput: "LN",
     ...din(12, 95, 60),
     source: {
-      file: "DIN-4DIMU4 / 同族 DIN 调光 12M 常见占位",
+      file: "DIN-4DIMU4 历史占位（无本型号官方规格）",
       url: "https://www.crestron.com/Products/Catalog/Lighting-and-Environmental/Integrated-Lighting-Systems/DIN-Modules",
-      pages: "12M",
+      pages: "未核实；目录链接不是本型号规格依据",
     },
-    note: "外形按 Crestron DIN 四路调光常见 12M；请以 DIN-4DIMU4 本型号 Spec 复核。",
+    availability: "历史占位 · 型号和参数未获官网核实",
+    note: "历史目录条目：未找到 DIN-4DIMU4 的官网产品或规格书。保留原 ID、4 路与 12M 占位以兼容旧方案，不代表参数已核实；请核对实物铭牌，可选已核实的 DIN-1DIMU4 或 DIN-1DIM4。",
   }),
   makeSmartProduct({
     id: "crestron-din-1dimu4",
@@ -73,7 +79,9 @@ export const CRESTRON_PRODUCTS = [
     sku: "DIN-1DIMU4",
     kind: "dimmer",
     zone: "control",
-    channels: 1,
+    channels: 4,
+    channelAmps: 5,
+    amps: 10,
     protocol: ["cresnet"],
     powerInput: "LN",
     ...din(12, 95, 60),
@@ -82,6 +90,27 @@ export const CRESTRON_PRODUCTS = [
       url: "https://www.crestron.com/getmedia/174b53ac-c921-42ba-99bf-6fbfd7ccdd77/ss_DIN-1DIMU4",
       pages: "Enclosure",
     },
+    note: "4 路通用调光，1 路馈入；120–240VAC，50/60Hz；每路最大 5A、模块合计 10A；支持前沿/后沿及负载自动检测。市电缺失时 Cresnet 功耗 0.6W。安装需上下至少 102mm 通风间距（推荐 153mm）。",
+  }),
+  makeSmartProduct({
+    id: "crestron-din-1dim4",
+    brand,
+    name: "DIN-1DIM4",
+    sku: "DIN-1DIM4",
+    kind: "dimmer",
+    zone: "control",
+    channels: 4,
+    channelAmps: 5,
+    amps: 10,
+    protocol: ["cresnet"],
+    powerInput: "LN",
+    ...din(12, 95, 60),
+    source: {
+      file: "DIN-1DIM4 official specifications",
+      url: "https://www.crestron.com/Products/Catalog/Lighting-and-Environmental/Integrated-Lighting-Systems/DIN-Modules/DIN-1DIM4",
+      pages: "Power / Load Ratings / Dimensions",
+    },
+    note: "4 路前沿调光，1 路馈入；按官网详细规格为 120–277VAC，50/60Hz；每路最大 5A、合计 10A。非 DIN-1DIMU4 的前后沿通用型号。市电缺失时 Cresnet 功耗 0.6W；上下至少 102mm 通风间距（推荐 153mm）。官网概览另写 120–240VAC，选型应核对实物版本。",
   }),
   makeSmartProduct({
     id: "crestron-din-4dimflv4",
@@ -94,6 +123,11 @@ export const CRESTRON_PRODUCTS = [
     protocol: ["cresnet", "0-10v"],
     powerInput: "LN",
     ...din(9, 95, 60),
+    width: 159,
+    channelAmps: 5,
+    amps: 20,
+    busConsumption: { value: 4.2, unit: "W" },
+    note: "4 路 0–10V 调光，4 路独立负载馈入；120–240VAC，每路 5A、合计 20A（阻性额定另为每路 16A，不可混用）。控制侧 Cresnet 24VDC / 4.2W。机身宽 159mm，预留 9M。",
     source: {
       file: "ss_din-4dimflv4",
       url: "https://www.crestron.com/getmedia/467c581a-4bda-4033-9699-004b1ace33f0/ss_din-4dimflv4",
@@ -107,14 +141,16 @@ export const CRESTRON_PRODUCTS = [
     sku: "DIN-DALI-2",
     kind: "gateway",
     zone: "control",
-    protocol: ["dali", "cresnet"],
-    powerInput: "LN",
+    protocol: ["dali", "cresnet", "poe"],
+    powerInput: "cresnet-or-poe",
     channels: 2,
     ...din(9, 95, 60),
+    width: 159,
+    note: "2 个独立 DALI 回路，每回路最多 64 个驱动器。Cresnet 或 PoE 供电，不接市电 L/N；Cresnet 功耗内置 DALI 电源模式 9W、外置模式 2W。每回路供电保证 150mA、最大 250mA。机身宽 159mm，预留 9M。",
     source: {
       file: "DIN-DALI-2 Spec Sheet",
       url: "https://www.crestron.com/Products/Catalog/Lighting-and-Environmental/Integrated-Lighting-Systems/DIN-Modules/DIN-DALI-2",
-      pages: "Enclosure · 9M / 162mm",
+      pages: "Dimensions · 9M / 159mm",
     },
   }),
   makeSmartProduct({
@@ -136,7 +172,7 @@ export const CRESTRON_PRODUCTS = [
       url: "https://www.crestron.com/getmedia/6b3a61b1-917d-40b9-9887-37b388a678ac/ss_DIN-DLI",
       pages: "Dimensions · 3M / 52.83×93.70×59 mm",
     },
-    note: "外形按 Crestron Spec Sheet：3 DIN spaces，宽 52.83 mm（占位约 54 mm）；电气额定待核。",
+    note: "1 个 DALI 回路，最多 64 个驱动器；Cresnet 24VDC / 6W 或 PoE / 6.5W 供电。内置 DALI 电源持续 170mA、最大 250mA，不可外接 DALI 电源。3M 占位，机身 52.83×93.70×59mm。",
   }),
   makeSmartProduct({
     id: "crestron-din-2mc2",
@@ -148,7 +184,10 @@ export const CRESTRON_PRODUCTS = [
     channels: 2,
     protocol: ["cresnet"],
     powerInput: "LN",
-    ...din(6, 95, 60),
+    ...din(6, 94.2, 59.5),
+    width: 106,
+    busConsumption: { value: 3, unit: "W" },
+    note: "2 路三线双向电机控制、2 路负载馈入；每路 240VAC / 0.5HP，合计 1HP。控制侧 Cresnet 24VDC / 3W。机身 106×94.2×59.5mm，预留 6M；通道为电机数量，不是方向触点数量。",
     source: {
       file: "DIN-2MC2 product page",
       url: "https://www.crestron.com/Products/Catalog/Lighting-and-Environmental/Integrated-Lighting-Systems/DIN-Modules/DIN-2MC2",
@@ -164,12 +203,15 @@ export const CRESTRON_PRODUCTS = [
     zone: "control",
     protocol: ["cresnet"],
     powerInput: "LN",
-    psuOutput: null,
-    ...din(6, 95, 60),
+    psuOutput: { voltage: 24, amps: 2.08, watts: 50 },
+    ...din(6, 94.2, 58),
+    width: 106,
+    availability: "官网已停产 · 尺寸与电源额定已核实",
+    note: "100–240VAC、50/60Hz 输入（60W），24VDC 输出，模块总容量 50W / 2.08A；3 个并联输出端口共享总容量，不是每口各有 50W。官方已停产，旧方案保留；替代选型参见 DIN-PWS60。",
     source: {
       file: "DIN-PWS50 Spec Sheet",
-      url: "https://partnerzon.specialelektronik.se/storage/files/products/d795292291eb4f4f512f1343677c3c3acb49bb44.pdf",
-      pages: "Enclosure · 6M / 108mm",
+      url: "https://www.crestron.com/Products/Catalog/Inactive/Discontinued/D/DIN-PWS50",
+      pages: "Dimensions · 6M / 106mm",
     },
   }),
 ];

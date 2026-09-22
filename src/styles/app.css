@@ -37,6 +37,10 @@
 .inspector-top .product-preview{width:73px;height:87px;background:#edf3ea}.inspector-top{gap:13px}
 .library-row{padding:10px 12px;gap:8px}.library-row strong{font-size:11px}.library-info small{font-size:9px}
 .canvas-wrap.studio-dark{background:#202a24}
+.canvas-controls .explode-scope{appearance:none;height:27px;max-width:148px;border:1px solid #dce3db;border-radius:3px;padding:0 25px 0 9px;font-size:10px;cursor:pointer;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23a8bdae' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center}
+.studio-dark .canvas-controls .explode-scope{color:#a8bdae;background-color:#28362f;border-color:#526b5866;color-scheme:dark}
+.studio-dark .canvas-controls .explode-scope:hover{background-color:#34483b}
+.studio-dark .canvas-controls .explode-scope option{background:#28362f;color:#d5e3d8}
 .studio-dark .canvas-top{background:#202a24ed;border-bottom:1px solid #718a7620;color:#e6eee5}
 .studio-dark .canvas-top p,.studio-dark .canvas-top .series{color:#829b89}
 .studio-dark .canvas-controls,.studio-dark .canvas-tools,.studio-dark .zoom,.studio-dark .wire-mode,.studio-dark .quality-select,.studio-dark .explode-control{background:#28362fe8;border-color:#526b5866;color:#a2b7a6}

@@ -7,7 +7,7 @@ import { makeSmartProduct } from "./_smart-factory.js";
 
 const PT_SOURCE = {
   file: "Phoenix Contact PT 2.5 系列",
-  url: "https://www.phoenixcontact.com/",
+  url: "https://www.phoenixcontact.com/us/products/3209510/pdf",
   pages: "PT 2.5",
 };
 
@@ -28,14 +28,18 @@ function ptStrip(color, poles, orderNo, name) {
     channelAmps: 24,
     amps: 24,
     width,
-    height: 48.5,
+    height: 48.6,
     depth: 35.3,
     modules,
     color: color === "bu" ? "#2f6fbf" : "#8a8f96",
     terminalColor: color === "bu" ? "blue" : "gray",
     conductor: color === "bu" ? "N" : "L",
     powerInput: "none",
-    source: PT_SOURCE,
+    source: color === "bu" ? {
+      ...PT_SOURCE,
+      url: "https://www.phoenixcontact.com/assets/e3493887-5de4-4af1-9966-f497e60dfd31/index.html",
+      pages: "71 · PT 2,5 / PT 2,5 BU",
+    } : PT_SOURCE,
     note:
       color === "bu"
         ? "蓝色零线端子：灯/负载 N 先上端子，再跳线到模块或 N 排。推入式 PT 2.5。"

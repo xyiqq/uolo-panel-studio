@@ -1,4 +1,5 @@
 import { createIcons, icons } from "lucide";
+import { clearDevices } from "../core/clear-devices.js";
 import {
   eX, _s, $s, Ka, kA, AX, sX, aX, Me, gA, js, Co, ea, ta, fr, Mo, W1, N1, yo, ka,
   Ue, HA, Za, Qe, bA, Eo, Yr, _r, Js
@@ -8,6 +9,12 @@ import { TerminalStudio3D as Qo } from "../view/terminal-studio3d.js";
 import { EVIDENCE_IMAGES as To } from "../assets/evidence/index.js";
 import { mountV5Bridge } from "./v5-bridge.js";
 import { renderTerminalConnections } from './terminal-connections.js';
+import { readInstallPosition, rememberInstallPosition } from './install-position.js';
+import {resolveModuleFeedBindings} from '../core/module-feeds.js';
+import {buildDeliveryNet} from '../core/delivery-net.js';
+import {wireRows as deliveryWireRows} from '../core/handover.js';
+import {applyLabelRules as deliveryLabels} from '../core/labels.js';
+let explodeScope='all';
 import {
   GROUPS as BUILTIN_GROUPS,
   OTHER_GROUP,
@@ -71,7 +78,7 @@ import "../styles/simple-mode.css";
 const sz = createIcons;
 const un = icons;
 
-var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[t]),Ut=a=>`<i data-lucide="${a}"></i>`,We=(a,t,e,r="")=>`<button id="${a}" class="ib ${r}" title="${e}" aria-label="${e}">${Ut(t)}</button>`,an=a=>`<div class="mini product-preview" style="--tone:${a.color}"><img data-thumb="${it(a.id)}" alt="${it(a.name)}" decoding="async"><span>${a.amps?"C"+a.amps:a.modules!=null?a.modules+"M":a.smart||a.zone==="control"?"SMART":"T2"}</span></div>`,re=(a,t)=>a.map(([e,r])=>`<option value="${it(e)}" ${String(e)===String(t)?"selected":""}>${it(r)}</option>`).join(""),Bt=(a,t)=>`<label class="field"><span>${a}</span>${t}</label>`,TA=(a,t,e,r,s,n="1")=>`<div class="unit"><input id="${a}" type="number" value="${t??""}" min="${r}" max="${s}" step="${n}"><em>${e}</em></div>`,hX="panel-studio-v4",Y=createBlankDesign(),K1="\u672C\u5730\u65B9\u6848",G1="";try{let a=JSON.parse(R("#embedded-design").textContent),t=localStorage.getItem(hX),e=a?_s(a):t?_s(JSON.parse(t)):null;e&&($s(e),Y=e)}catch(a){G1="\u5B58\u50A8\u65B9\u6848\u672A\u901A\u8FC7\u6821\u9A8C\uFF0C\u5DF2\u8F7D\u5165\u6E90\u8868\u65B9\u6848\uFF1A"+a.message}var je=Y.circuits.find(a=>/烤箱/.test(a.name))?.id||Y.circuits[0]?.id||"Q0",EA=null,BA="assembly",pr="tree",Ja=isSimpleMode(Y)?"channels":"circuits",zr="issues",mX="",k1=!1,Ge={power:!1,trip:null},_a="perspective",vX="selected",Bo=!1,cr=!1,hr=1,Ke=!1,wr=1,Ya="dark",pX="standard",Aa=[],sn=[],kt,Xe,ts,Je,qt,An=new Set(["hvac","lighting","sockets","smart","av"]);document.documentElement.dataset.uiMode=getUiMode(Y);R("#app").innerHTML=`
+var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[t]),Ut=a=>`<i data-lucide="${a}"></i>`,We=(a,t,e,r="")=>`<button id="${a}" class="ib ${r}" title="${e}" aria-label="${e}">${Ut(t)}</button>`,an=a=>`<div class="mini product-preview" style="--tone:${a.color}"><img data-thumb="${it(a.id)}" alt="${it(a.name)}" decoding="async"><span>${a.amps?"C"+a.amps:a.modules!=null?a.modules+"M":a.smart||a.zone==="control"?"SMART":"T2"}</span></div>`,re=(a,t)=>a.map(([e,r])=>`<option value="${it(e)}" ${String(e)===String(t)?"selected":""}>${it(r)}</option>`).join(""),Bt=(a,t)=>`<label class="field"><span>${a}</span>${t}</label>`,TA=(a,t,e,r,s,n="1")=>`<div class="unit"><input id="${a}" type="number" value="${t??""}" min="${r}" max="${s}" step="${n}"><em>${e}</em></div>`,hX="panel-studio-v4",Y=createBlankDesign(),K1="\u672C\u5730\u65B9\u6848",G1="";try{let a=JSON.parse(R("#embedded-design").textContent),t=localStorage.getItem(hX),e=a?_s(a):t?_s(JSON.parse(t)):null;e&&($s(e),Y=e)}catch(a){G1="\u5B58\u50A8\u65B9\u6848\u672A\u901A\u8FC7\u6821\u9A8C\uFF0C\u5DF2\u8F7D\u5165\u6E90\u8868\u65B9\u6848\uFF1A"+a.message}var je=Y.circuits.find(a=>/烤箱/.test(a.name))?.id||Y.circuits[0]?.id||"Q0",EA=null,BA="assembly",pr="tree",Ja=isSimpleMode(Y)?"channels":"circuits",zr="issues",mX="",k1=!1,Ge={power:!1,trip:null},_a="perspective",vX="selected",Bo=!1,cr=!1,hr=1,Ke=!1,Ya="dark",pX="standard",Aa=[],sn=[],kt,Xe,ts,Je,qt,An=new Set(["hvac","lighting","sockets","smart","av"]);document.documentElement.dataset.uiMode=getUiMode(Y);R("#app").innerHTML=`
 <div class="shell">
 <header class="topbar">
   <div class="brand"><div class="brand-mark">${Ut("panels-top-left")}</div><div><h1>\u914D\u7535\u5DE5\u574A <span style="font-weight:400;color:#a9bab0">/ 04</span></h1><small>MECHANICAL INSPECTION STUDIO</small></div></div>
@@ -91,6 +98,7 @@ var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"
       <button type="button" class="btn" id="design-templates" style="margin-top:8px;width:100%">${Ut("layout-template")} \u65b9\u6848\u6a21\u677f\u2026</button>
       <button type="button" class="btn" id="save-as-template" style="margin-top:8px;width:100%">${Ut("bookmark-plus")} \u5b58\u4e3a\u8bbe\u5907\u6a21\u677f</button>
       <button type="button" class="btn" id="manage-groups" style="margin-top:8px;width:100%">${Ut("shapes")} 逻辑分区…</button>
+      <button type="button" class="btn danger" id="clear-devices" style="margin-top:8px;width:100%">${Ut("trash-2")} 一键清空设备</button>
       <div class="stat-strip"><span>\u6A21\u6570\u5360\u7528</span><span id="capacity"></span></div><div class="progress"><i id="capacity-bar"></i></div>
       <div class="source-badge" id="source-badge">${Ut("sheet")}<span id="source-badge-text"></span></div>
     </section>
@@ -112,7 +120,7 @@ var R=a=>document.querySelector(a),it=a=>String(a??"").replace(/[&<>"']/g,t=>({"
       <div id="overlay">
         <div class="canvas-top"><h2 id="model-title"></h2><p id="model-dimensions"></p><div class="series"><span>BOJING SERIES</span><span>\xB7</span><span id="scope-label"></span></div></div>
         <div class="canvas-controls"><button data-mode="perspective" class="active">\u4E09\u7EF4</button><button data-mode="front">\u6B63\u89C6</button><button id="focus">\u805A\u7126</button><button id="inspect-only">${Ut("scan-eye")}\u5355\u4EF6</button><button id="explode">${Ut("layers-3")}\u62C6\u89E3</button></div>
-        <div class="explode-control" id="explode-control" hidden><span>\u5C55\u5F00\u7A0B\u5EA6</span><input id="explode-range" type="range" min="0" max="100" value="100" aria-label="\u5C55\u5F00\u7A0B\u5EA6"><output id="explode-value">100%</output></div>
+
         <div class="canvas-tools">
           ${We("select-mode","mouse-pointer-2","\u9009\u62E9\u5668\u4EF6","active")}${We("move-mode","move","\u79FB\u52A8\u56DE\u8DEF\u5668\u4EF6")}
           ${We("pan-mode","hand","\u62D6\u52A8\u5E73\u79FB\u753B\u9762")}
@@ -162,7 +170,7 @@ function gX(){
   }));
   Je=[...AX(Y,kt),...sX(Xe,Y),...smartIssues];
   EA&&!Xe.wires.some(a=>a.id===EA)&&(EA=null)
-}function Y1(){try{localStorage.setItem(hX,JSON.stringify(Y)),K1="\u5DF2\u4FDD\u5B58\u5230\u672C\u673A"}catch{K1="\u5B58\u50A8\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5BFC\u51FA JSON"}}function de(a,t=!1){let e=ea(Y);if(a(Y),t){Y.disconnected=[],Y.wireOverrides={},EA=null;let r=new Set(Ka(Y).nodes.map(s=>s.id));Y.states=Object.fromEntries(Object.entries(Y.states).filter(([s])=>r.has(s)))}JSON.stringify(e)!==JSON.stringify(Y)&&(Aa.push(e),Aa.length>50&&Aa.shift(),sn=[],Ge.trip=null,Y1(),ra())}function MA(a,t){R("#modal-title").textContent=a,R("#modal-body").innerHTML=t,R("#modal").showModal(),Ye()}function kU(a,t,e,r){R(a).onchange=s=>{let n=s.target.valueAsNumber;if(!Number.isFinite(n)||n<t||n>e){pe(`\u8BF7\u8F93\u5165 ${t} \u81F3 ${e} \u4E4B\u95F4\u7684\u6570\u503C`),As();return}r(n)}}function es(){return Y.circuits.find(a=>a.id===je)||kt.nodes.find(a=>a.id===je)?.circuit}function KU(a){let t=ts.circuits[a.id];return t.phasePresent&&!t.phaseOk?"\u7F3A\u76F8 \xB7 \u90E8\u5206\u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.neutralOk?"\u7F3A N \xB7 \u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.peOk?"PE \u65AD\u5F00 \xB7 \u4ECD\u5E26\u7535":Ge.trip===a.id?"\u6A21\u62DF\u8DF3\u95F8":t.powered?"\u6B63\u5E38\u4F9B\u7535":"\u672A\u5F62\u6210\u6B63\u5E38\u4F9B\u7535"}function VA(a){je=a,EA=null,As(),UA(),rs(),WA(),Ye()}function bX(a){let t=Xe.wires.find(e=>e.id===a);t&&(t.circuit&&(je=t.circuit),EA=a,Ke=!1,As(),rs(),WA(),Ye())}function GU(){return{selected:kt.nodes.some(a=>a.id===je)?je:es()?.id||je,wireMode:vX,door:Bo,exploded:cr,explodeAmount:wr,isolate:Ke,sim:Ge}}function CX(a){je=a,EA=null,Ke=!0,As(),UA(),WA(),Ye()}function WA(){let a=kt.nodes.find(e=>e.id===je)||kt.nodes.find(e=>e.circuit?.id===je);if(Ke&&(!a||a.overflow)&&(Ke=!1),R("#inspect-only").disabled=!a||!!a.overflow,R("#inspect-only").classList.toggle("active",Ke),R("#explode").classList.toggle("active",cr),R("#explode-control").hidden=!cr,R("#explode-range").value=Math.round(wr*100),R("#explode-value").textContent=Math.round(wr*100)+"%",R("#wire-mode").disabled=Ke||cr&&wr>0,R(".canvas-wrap").classList.toggle("is-isolated",Ke),Ke&&a)R("#model-title").textContent=a.product.name,R("#model-dimensions").textContent=`${a.product.width} \xD7 ${a.product.height} \xD7 ${a.product.depth} mm \xB7 ${a.product.brand}`,R("#scope-label").textContent=`${a.id} \xB7 \u5355\u4EF6\u68C0\u89C6`;else{R("#model-title").textContent=kt.box.name,R("#model-dimensions").textContent=`\u7BB1\u4F53 ${kt.box.width} \xD7 ${kt.box.height} \xD7 ${kt.box.depth} mm \xB7 ${kt.box.rows} \u6392 / ${kt.box.slots}P \xB7 ${kt.box.slots*18} mm`;let e=kt.nodes.filter(r=>r.overflow).length;R("#scope-label").textContent=e?`${e} \u4E2A\u7EC4\u4EF6\u672A\u88C5\u5165 \xB7 \u5BB9\u91CF\u4E0D\u8DB3`:cr?`\u5206\u5C42\u62C6\u89E3 \xB7 ${Math.round(wr*100)}%`:`${kt.nodes.length} \u4E2A\u7EC4\u4EF6 \xB7 \u6574\u67DC`}let t=JSON.stringify(kt.nodes.map(e=>[e.id,e.label,qt?.thumbnails.key(e.product)||e.product,e.overflow]));R("#parts-scroll").dataset.key!==t&&(R("#parts-scroll").dataset.key=t,R("#parts-scroll").innerHTML=kt.nodes.filter(e=>!e.overflow).map(e=>`<button class="part-tile" data-part="${e.id}" title="${it(e.id+" \xB7 "+e.label)}" aria-label="\u68C0\u89C6 ${it(e.id+" "+e.label)}"><img data-thumb="${it(e.product.id)}" alt="${it(e.label)}" decoding="async"><span>${e.id}</span></button>`).join(""),document.querySelectorAll("[data-part]").forEach(e=>e.onclick=()=>CX(e.dataset.part))),document.querySelectorAll("[data-part]").forEach(e=>e.classList.toggle("active",e.dataset.part===a?.id)),R("#part-caption").textContent=a?`${a.id} \xB7 ${a.label}`:"\u7EC4\u4EF6\u68C0\u89C6",qt?.build(Xe,Y,ts,GU()),xX()}function fillCabinetSelect(a){let t=allCabinets(a),e=[["\u739B\u5FB7\u514B",t.filter(r=>r.brand==="\u739B\u5FB7\u514B"||["MH144","Q120","Q96"].includes(r.id))],["\u901A\u7528\u4F30\u7B97",t.filter(r=>r.brand==="\u901A\u7528"||r.estimated&&!r.custom)],["\u81ea\u5b9a\u4e49",t.filter(r=>r.custom)]],r="";for(let[s,n]of e){if(!n.length)continue;r+=`<optgroup label="${it(s)}">`;for(let o of n)r+=`<option value="${it(o.id)}" ${o.id===a.cabinet?"selected":""}>${it(o.name)}${o.estimated?" \xB7 \u4F30\u7B97":""}</option>`;r+="</optgroup>"}R("#cabinet").innerHTML=r}function openCustomCabinetDialog(){let a={rows:2,slots:24,depth:120,mount:"\u660e\u88c5"};MA("\u81ea\u5b9a\u4e49\u7bb1\u4f53",`
+}function Y1(){try{localStorage.setItem(hX,JSON.stringify(Y)),K1="\u5DF2\u4FDD\u5B58\u5230\u672C\u673A"}catch{K1="\u5B58\u50A8\u4E0D\u53EF\u7528\uFF0C\u8BF7\u5BFC\u51FA JSON"}}function de(a,t=!1){let e=ea(Y);if(a(Y),t){Y.disconnected=[],Y.wireOverrides={},EA=null;let r=new Set(Ka(Y).nodes.map(s=>s.id));Y.states=Object.fromEntries(Object.entries(Y.states).filter(([s])=>r.has(s)))}JSON.stringify(e)!==JSON.stringify(Y)&&(Aa.push(e),Aa.length>50&&Aa.shift(),sn=[],Ge.trip=null,Y1(),ra())}function MA(a,t){R("#modal-title").textContent=a,R("#modal-body").innerHTML=t,R("#modal").showModal(),Ye()}function kU(a,t,e,r){R(a).onchange=s=>{let n=s.target.valueAsNumber;if(!Number.isFinite(n)||n<t||n>e){pe(`\u8BF7\u8F93\u5165 ${t} \u81F3 ${e} \u4E4B\u95F4\u7684\u6570\u503C`),As();return}r(n)}}function es(){return Y.circuits.find(a=>a.id===je)||kt.nodes.find(a=>a.id===je)?.circuit}function KU(a){let t=ts.circuits[a.id];return t.phasePresent&&!t.phaseOk?"\u7F3A\u76F8 \xB7 \u90E8\u5206\u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.neutralOk?"\u7F3A N \xB7 \u76F8\u7EBF\u4ECD\u5E26\u7535":t.phasePresent&&!t.peOk?"PE \u65AD\u5F00 \xB7 \u4ECD\u5E26\u7535":Ge.trip===a.id?"\u6A21\u62DF\u8DF3\u95F8":t.powered?"\u6B63\u5E38\u4F9B\u7535":"\u672A\u5F62\u6210\u6B63\u5E38\u4F9B\u7535"}function VA(a){je=a,EA=null,As(),UA(),rs(),WA(),Ye()}function bX(a){let t=Xe.wires.find(e=>e.id===a);t&&(t.circuit&&(je=t.circuit),EA=a,Ke=!1,As(),rs(),WA(),Ye())}function GU(){return{selected:kt.nodes.some(a=>a.id===je)?je:es()?.id||je,wireMode:vX,door:Bo,exploded:cr,explodeScope,explodeAmount:1,isolate:Ke,sim:Ge}}function CX(a){je=a,EA=null,Ke=!0,As(),UA(),WA(),Ye()}function WA(){let a=kt.nodes.find(e=>e.id===je)||kt.nodes.find(e=>e.circuit?.id===je);if(Ke&&(!a||a.overflow)&&(Ke=!1),R("#inspect-only").disabled=!a||!!a.overflow,R("#inspect-only").classList.toggle("active",Ke),R("#explode").classList.toggle("active",cr),R("#wire-mode").disabled=false,R(".canvas-wrap").classList.toggle("is-isolated",Ke),Ke&&a)R("#model-title").textContent=a.product.name,R("#model-dimensions").textContent=`${a.product.width} \xD7 ${a.product.height} \xD7 ${a.product.depth} mm \xB7 ${a.product.brand}`,R("#scope-label").textContent=`${a.id} \xB7 \u5355\u4EF6\u68C0\u89C6`;else{R("#model-title").textContent=kt.box.name,R("#model-dimensions").textContent=`\u7BB1\u4F53 ${kt.box.width} \xD7 ${kt.box.height} \xD7 ${kt.box.depth} mm \xB7 ${kt.box.rows} \u6392 / ${kt.box.slots}P \xB7 ${kt.box.slots*18} mm`;let e=kt.nodes.filter(r=>r.overflow).length;R("#scope-label").textContent=e?`${e} \u4E2A\u7EC4\u4EF6\u672A\u88C5\u5165 \xB7 \u5BB9\u91CF\u4E0D\u8DB3`:cr?`\u5206\u5C42\u62C6\u89E3 \xB7 100%`:`${kt.nodes.length} \u4E2A\u7EC4\u4EF6 \xB7 \u6574\u67DC`}let t=JSON.stringify(kt.nodes.map(e=>[e.id,e.label,qt?.thumbnails.key(e.product)||e.product,e.overflow]));R("#parts-scroll").dataset.key!==t&&(R("#parts-scroll").dataset.key=t,R("#parts-scroll").innerHTML=kt.nodes.filter(e=>!e.overflow).map(e=>`<button class="part-tile" data-part="${e.id}" title="${it(e.id+" \xB7 "+e.label)}" aria-label="\u68C0\u89C6 ${it(e.id+" "+e.label)}"><img data-thumb="${it(e.product.id)}" alt="${it(e.label)}" decoding="async"><span>${e.id}</span></button>`).join(""),document.querySelectorAll("[data-part]").forEach(e=>e.onclick=()=>CX(e.dataset.part))),document.querySelectorAll("[data-part]").forEach(e=>e.classList.toggle("active",e.dataset.part===a?.id)),R("#part-caption").textContent=a?`${a.id} \xB7 ${a.label}`:"\u7EC4\u4EF6\u68C0\u89C6",qt?.build(Xe,Y,ts,GU()),xX()}function fillCabinetSelect(a){let t=allCabinets(a),e=[["\u739B\u5FB7\u514B",t.filter(r=>r.brand==="\u739B\u5FB7\u514B"||["MH144","Q120","Q96"].includes(r.id))],["\u901A\u7528\u4F30\u7B97",t.filter(r=>r.brand==="\u901A\u7528"||r.estimated&&!r.custom)],["\u81ea\u5b9a\u4e49",t.filter(r=>r.custom)]],r="";for(let[s,n]of e){if(!n.length)continue;r+=`<optgroup label="${it(s)}">`;for(let o of n)r+=`<option value="${it(o.id)}" ${o.id===a.cabinet?"selected":""}>${it(o.name)}${o.estimated?" \xB7 \u4F30\u7B97":""}</option>`;r+="</optgroup>"}R("#cabinet").innerHTML=r}function openCustomCabinetDialog(){let a={rows:2,slots:24,depth:120,mount:"\u660e\u88c5"};MA("\u81ea\u5b9a\u4e49\u7bb1\u4f53",`
     <p>\u6309\u901a\u7528\u4f30\u7b97\u516c\u5f0f\u751f\u6210\u7bb1\u4f53\uff08\u6392\u8ddd 150 mm\uff09\uff1b\u987b\u4ee5\u6240\u9009\u5382\u5bb6\u56fe\u7eb8\u4e3a\u51c6\uff0c\u4e0d\u5f97\u76f4\u63a5\u7528\u4e8e\u65bd\u5de5\u3002</p>
     <div class="field-grid">${Bt("\u6392\u6570",TA("cab-rows",a.rows,"\u6392",1,12,1))}
       ${Bt("\u6bcf\u6392 P \u6570",TA("cab-slots",a.slots,"P",6,48,1))}</div>
@@ -184,6 +192,22 @@ function moduleAddressFields(m){
     (['ip','both'].includes(mode)?Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(m.id)}" value="${it(m.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)+'<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'');
 }
 function ra(){
+  if(!R('#explode-scope')){
+    const scope=document.createElement('select');scope.id='explode-scope';
+    scope.setAttribute('aria-label','拆解范围');scope.title='拆解范围';
+    scope.innerHTML='<option value="all">整柜拆解</option><option value="selected">所选器件拆解</option>';
+    scope.className='explode-scope';
+    R('#explode').after(scope);
+    scope.onchange=()=>{
+      explodeScope=scope.value;
+      cr=true;Ke=explodeScope==='selected';
+      WA();qt?.fit(Ke);
+    };
+  }
+  const wireMode=R('#wire-mode');
+  if(wireMode && !wireMode.dataset.initialized){
+    vX='all';wireMode.value='all';wireMode.dataset.initialized='true';
+  }
   gX();
   if(!R('#cabinet-nbar')){
     const field=document.createElement('label');field.className='field';
@@ -225,10 +249,16 @@ function ra(){
     R('.nav').append(terminalTab);
     terminalTab.addEventListener('click',()=>{BA='terminal-connections';ra()});
     R('#inspector').addEventListener('click',event=>{
+      const explodeButton=event.target.closest('[data-explode-module]');
+      if(explodeButton){
+        je=explodeButton.dataset.explodeModule;EA=null;explodeScope='selected';
+        R('#explode-scope').value='selected';Ke=true;cr=true;
+        WA();qt?.fit(true);return;
+      }
       const button=event.target.closest('[data-terminal-connect]');
       if(!button) return;
       MA('端子连接 '+button.dataset.terminalConnect,'');
-      renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect});
+      renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect,onSaved:()=>{R('#modal').close();pe('接线已保存');}});
     });
     R('#inspector').addEventListener('change',event=>{
       const nameInput=event.target.closest('[data-display-name]');
@@ -292,8 +322,8 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
       ${f?`<div class="inspector-top">${an(f)}<div><strong>${it(f.name)}</strong><small>${f.id}</small></div></div>${VX(f)}
       ${f.kind!=="spd"?`<label class="switch-label" style="margin-top:15px"><input id="node-on" class="switch" type="checkbox" ${Y.states[t.id]!==!1?"checked":""}>\u5408\u95F8 / \u6295\u5165</label>`:""}`:""}
       ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3>${moduleAddressFields(t.module)}<div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
-      ${Bt("共用空开 / 漏保",`<select id="insp-mod-protect">${re(breakerOptions(),t.module?.protectId||"")}</select>`)}
-      <button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
+      ${t.product.kind==='terminal'?'':Bt("对应支路空开（一对一）",`<select id="insp-mod-protect">${re(breakerOptions(t.id),t.module?.protectId||"")}</select>`)}
+      <button class="btn" data-explode-module="${it(t.id)}" style="width:100%;margin-top:8px">单模块拆解与接线</button><button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
       <button class="btn" id="project-settings" style="width:100%;margin-top:12px">${Ut("settings-2")}\u7535\u6E90\u4E0E\u8BBE\u8BA1\u6761\u4EF6</button></section>
       <section class="side-section"><h3>N / PE 布局</h3><p class="condition">${Y.includeNeutralBar===false?"未安装零线排":"零线排："+(({top:"上方横装",bottom:"下方横装",left:"左侧竖装",right:"右侧竖装"})[Y.nBarPosition]||"下方横装")}；${Y.includeEarthBar===false?"未安装地线排":"PE 排在右侧，并与金属箱体、门跨接"}。灯线先上菲尼克斯端子，再跳到继电器。</p></section>`,R("#project-settings").onclick=yX,R("#device-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")},R("#remove-device")?.addEventListener("click",()=>cX(t.id)),R("#edit-module")?.addEventListener("click",()=>{const m=Y.modules?.find(x=>x.id===t.id),p=Me(Y,m?.productId);m&&p&&openModuleDialog(p,m)}),R("#insp-mod-protect")?.addEventListener("change",ev=>{de(d=>setModuleProtect(d,t.id,ev.target.value||null),true);pe(ev.target.value?"已挂到共用保护 "+ev.target.value:"已取消共用保护")}),document.querySelectorAll("[data-insp-ch-label]").forEach(el=>el.addEventListener("change",()=>{const mid=el.dataset.inspChLabel,ch=+el.dataset.ch;de(d=>{const m=d.modules.find(x=>x.id===mid);if(!m)return;m.channelLabels=m.channelLabels||{};m.channelLabels[ch]=el.value.trim()},true)})),R("#node-on")?.addEventListener("change",u=>de(p=>p.states[t.id]=u.target.checked)),Ye()}let e=kA(Y,a),r=e.product,s=ka(Y,a),n=Je.filter(f=>f.circuit===a.id),o=js(Y).filter(f=>Mo(f,a.voltage)),i=Me(Y,a.rcdProductId),l=r.kind==="rcbo"?r:i;const deviceChain=(Array.isArray(a.devices)&&a.devices.length?a.devices:[{role:"protection",productId:a.productId},...(a.rcdProductId?[{role:"rcd",productId:a.rcdProductId}]:[])]).map(d=>{if(d.role==="protection")return `保护 · ${d.productId?it(gA(Me(Y,d.productId)||{id:d.productId})):"自动选型"}`;if(d.role==="rcd")return `漏保 · ${it(gA(Me(Y,d.productId)||{id:d.productId}))}`;if(d.role==="control"||d.role==="meter")return `${d.role==="meter"?"电表":"控制"} · ${it(d.moduleId)} CH${d.channel}`;return d.role}).join("<br>");R("#inspector").innerHTML=`
   ${t?.role==="branchRcd"?`<section class="side-section selected-part-spec"><div class="section-head"><h2>\u5F53\u524D\u68C0\u89C6\u90E8\u4EF6</h2><span class="tag">${t.id}</span></div>
@@ -350,10 +380,11 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     <p class="data-note">\u5165\u6237\u7535\u7F06\u4E0E\u7BB1\u5185\u8FDE\u63A5\u91C7\u7528\u5404\u81EA\u8BA1\u7B97\u6761\u4EF6\u3002\u84DD\u8272\u4E3A N\uFF0C\u9EC4\u7EFF\u53CC\u8272\u4E3A PE\uFF1B\u5206\u914D\u7AEF\u5B50/\u7AEF\u5B50\u6392\u8FD8\u9700\u6309\u7535\u6D41\u3001\u7EBF\u5F84\u3001\u5B54\u6570\u548C\u6BCF\u5B54\u5BFC\u7EBF\u6570\u91CF\u843D\u5B9E\u771F\u5B9E\u9644\u4EF6\u9009\u578B\u3002</p>`,R("#all-wires").onchange=r=>{k1=r.target.checked,EX(),Ye()},R("#wires-csv").onclick=wX,document.querySelectorAll("[data-wire]").forEach(r=>r.onclick=()=>bX(r.dataset.wire)),document.querySelectorAll("[data-wire-toggle]").forEach(r=>r.onclick=()=>{let s=r.dataset.wireToggle;de(n=>n.disconnected=n.disconnected.includes(s)?n.disconnected.filter(o=>o!==s):[...n.disconnected,s])})}function J1(){
   if(isSimpleMode(Y)){
     if(Ja==="loads"||Ja==="circuits") Ja="channels";
-    const rows=buildChannelRows(Y,id=>Me(Y,id));
+    const feeds=new Map(resolveModuleFeedBindings(kt,Y).map(b=>[b.moduleId,b]));
+    const rows=buildChannelRows(Y,id=>Me(Y,id)).map(r=>({...r,breaker:feeds.get(r.moduleId)?.breakerId||r.breaker}));
     let t="";
     if(Ja==="channels"){
-      t=$a(["模块","名称","型号","通道","备注","端子","共用空开","共用漏保"],rows.map(r=>`<tr>
+      t=$a(["模块","名称","型号","通道","备注","端子","对应空开","关联漏保"],rows.map(r=>`<tr>
         <td><button class="link" data-select="${it(r.moduleId)}">${it(r.moduleId)}</button></td>
         <td>${it(r.moduleLabel)}</td><td>${it(r.productName)}</td>
         <td>${r.channel===""?"—":"CH"+r.channel}</td>
@@ -367,7 +398,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     R("#pane").innerHTML=`<div class="pane-head"><div><h2>通道与设备</h2><p>${(Y.modules||[]).length} 个模块 · ${rows.filter(r=>r.label).length} 条已备注通道</p></div>
       <div class="tools"><button id="schedule-csv" class="btn">${Ut("download")}通道清单 CSV</button></div></div>
       <div class="subnav"><button data-data="channels" class="${Ja==="channels"?"active":""}">通道清单</button><button data-data="bom" class="${Ja==="bom"?"active":""}">器件清单</button></div>
-      ${t}<p class="data-note">简易布置：填写每路接什么灯/设备，并在模块上选择共用空开。强电计算已隐藏。</p>`;
+      ${t}<p class="data-note">每个模块对应一个支路空开，总空开为上游。未指定时按安装顺序对应。</p>`;
     document.querySelectorAll("[data-data]").forEach(e=>e.onclick=()=>{Ja=e.dataset.data,J1(),Ye()});
     document.querySelectorAll("[data-select]").forEach(e=>e.onclick=()=>{VA(e.dataset.select),innerWidth<=1e3&&R(".right").classList.add("open")});
     document.querySelectorAll("[data-product]").forEach(e=>e.onclick=()=>Uo(e.dataset.product));
@@ -504,9 +535,12 @@ function channelAssignHtml(product, channels, channelLabels, channelTerminals){
     return Bt("通道 CH"+ch,`<input data-mod-label="${ch}" maxlength="80" value="${it(lab)}" placeholder="备注"><select data-mod-ch="${ch}" style="margin-top:4px">${re(opts,cur)}</select><select data-mod-term="${ch}" style="margin-top:4px">${re(termOpts,term)}</select>`);
   }).join("")}</div>`;
 }
-function breakerOptions(){
-  const nodes=(kt?.nodes||[]).filter(n=>n.role==="branch"||n.role==="main"||n.role==="branchRcd");
-  return [["","— 不共用 —"],...nodes.map(n=>[n.id,`${n.id} · ${n.label||n.product?.name||""}`])];
+function breakerOptions(moduleId){
+  const bindings=resolveModuleFeedBindings(kt,Y);
+  const current=bindings.find(b=>b.moduleId===moduleId);
+  const used=new Set(bindings.filter(b=>b.moduleId!==moduleId).map(b=>b.breakerId));
+  const nodes=(kt?.nodes||[]).filter(n=>n.role==='branch'&&!used.has(n.id));
+  return [['',current?`自动对应 · ${current.breakerId}`:'自动按安装顺序对应'],...nodes.map(n=>[n.id,`${n.id} · ${n.label||n.product?.name||''}`])];
 }
 function openModuleDialog(product, existing){
   ensureModuleArrays(Y);
@@ -525,7 +559,8 @@ function openModuleDialog(product, existing){
   let protectId=existing?.protectId||null;
   let label=existing?.label||id+" "+(product.name||"");
   const slots=freeSlots(product, existing?.id||null);
-  const posKey=existing?.position?existing.position.row+"_"+existing.position.slot:(Y.positions?.[id]?Y.positions[id].row+"_"+Y.positions[id].slot:"auto");
+  const positionKind=product.kind==='terminal'?'terminal':'module';
+  const posKey=existing?.position?existing.position.row+"_"+existing.position.slot:(Y.positions?.[id]?Y.positions[id].row+"_"+Y.positions[id].slot:editing?'auto':readInstallPosition(positionKind,slots));
   const busOpts=[["","不挂总线"],...Y.buses.map(b=>[b.id,b.label+" ("+b.type+")"]),["__new__","＋ 新建总线…"]];
   const feedOpts=[["shared","共用馈电（模块总进线）"],["perChannel","每路馈电"],["none","无强电馈电（总线/自取电）"]];
   const circuitOpts=[["","— 未指定 —"],...Y.circuits.map(c=>[c.id,c.id+" "+c.name])];
@@ -535,9 +570,9 @@ function openModuleDialog(product, existing){
     ${Bt("模块名称",`<input id="mod-label" maxlength="40" value="${it(label)}">`)}
     ${Bt('备注名称',`<input id="mod-display-name" maxlength="40" placeholder="例如：客厅灯光网关" value="${it(existing?.displayName||'')}">`)}
     ${Bt('地址类型',`<select id="mod-address-mode">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],moduleAddressMode(existing||{}))}</select>`)}
-    <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" value="${it(existing?.hardwareId||'')}">`)}</div>
+    <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" aria-describedby="mod-id-error" value="${it(existing?.hardwareId||'')}">`)}<p id="mod-id-error" role="alert" style="color:#bf3030" hidden></p></div>
     <div id="mod-ip-field">${Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`)}</div>
-    ${isTerm?"":Bt("共用空开 / 漏保",`<select id="mod-protect">${re(breakerOptions(),protectId||"")}</select>`)}
+    ${isTerm?"":Bt("对应支路空开（一对一）",`<select id="mod-protect">${re(breakerOptions(id),protectId||"")}</select>`)}
     <div class="${simple||isTerm?"full-only":""}">
       <div class="field-grid">
         ${Bt("总线",`<select id="mod-bus">${re(busOpts,busId||"")}</select>`)}
@@ -547,16 +582,29 @@ function openModuleDialog(product, existing){
     </div>
     <div id="mod-channels">${channelAssignHtml(product, channels, channelLabels, channelTerminals)}</div>
     ${Bt("安装位置",`<select id="mod-pos">${re([["auto","自动顺延"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],posKey)}</select>`)}
-    <p class="lib-preview">${isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":simple?"为每一路填写灯具名并选择灰色 PT2.5 端子；多个模块可选同一空开。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
+    <p class="lib-preview">${isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":simple?"每个模块对应一个支路空开；总空开为上游，不参与模块分配。未指定时按安装顺序对应。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
+    <p id="mod-save-error" role="alert" style="color:#bf3030" hidden></p>
     <div class="field-grid" style="margin-top:8px">
       ${simple||isTerm?"":`<button class="btn" type="button" id="mod-suggest-smart">建议创建 C-SMART 取电回路</button>`}
       <button class="btn primary" type="button" id="mod-save">${editing?"保存模块":"装入模块"}</button>
     </div>`);
   const feedEl=R("#mod-feed"), feedC=R("#mod-feed-c");
+  rememberInstallPosition(R('#mod-pos'),positionKind);
+  const validateDialogId=()=>{
+    const input=R('#mod-hardware-id'), error=R('#mod-id-error');
+    let message='';
+    try { if(['id','both'].includes(R('#mod-address-mode').value)) validateHardwareId(Y,id,input.value); }
+    catch(err) { message=err.message; }
+    error.textContent=message; error.hidden=!message;
+    input.setAttribute('aria-invalid',String(!!message));
+    return !message;
+  };
+  R('#mod-hardware-id').addEventListener('input',validateDialogId);
   const syncAddressFields=()=>{
     const mode=R('#mod-address-mode').value;
     R('#mod-id-field').hidden=!['id','both'].includes(mode);
     R('#mod-ip-field').hidden=!['ip','both'].includes(mode);
+    validateDialogId();
   };
   R('#mod-address-mode').onchange=syncAddressFields;syncAddressFields();
   if(feedEl&&feedC){
@@ -581,6 +629,8 @@ function openModuleDialog(product, existing){
     });
   });
   R("#mod-save").onclick=()=>{
+    R('#mod-save-error').hidden=true;
+    if(!validateDialogId()){R('#mod-hardware-id').focus();return;}
     const nextLabel=R("#mod-label").value.trim()||id;
     let nextBus=R("#mod-bus")?.value||""; if(nextBus==="__new__") return pe("请先完成总线创建");
     const nextFeed=R("#mod-feed")?.value||"none";
@@ -638,7 +688,11 @@ function openModuleDialog(product, existing){
       }, true);
       VA(id);
       pe(editing?"模块已更新":"模块已装入 · "+id);
-    }catch(err){ pe(err.message||String(err)) }
+    }catch(err){
+      const error=R('#mod-save-error');
+      error.textContent=err.message||String(err);error.hidden=false;
+      error.scrollIntoView({block:'nearest'});
+    }
   };
 }
 function openModuleManager(){
@@ -684,9 +738,10 @@ function openInstallDialog(t,e){
     MA("装入空开 / 保护",`<p>${it(t.brand)} · ${it(t.name)} · ${t.amps!=null?t.amps+" A · ":""}${t.width} mm / ${t.modules} M</p>
       ${Bt("名称",`<input id="install-name" value="${it(t.name)}" maxlength="80">`)}
       ${Bt("逻辑分区",`<select id="install-group">${re(groups.filter(r=>r.id!=="other").map(r=>[r.id,r.name]),defaultGroup)}</select>`)}
-      ${Bt("安装位置",`<select id="install-pos">${re([["auto","自动顺延"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],"auto")}</select>`)}
-      <p class="lib-preview">装入后可在智能模块里选择它作为「共用空开」。铭牌额定电流：${t.amps!=null?t.amps+" A":"—"}。</p>
+      ${Bt("安装位置",`<select id="install-pos">${re([["auto","自动顺延"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],readInstallPosition('protection',slots))}</select>`)}
+      <p class="lib-preview">装入后按顺序对应一个模块，也可在模块中指定支路空开。铭牌额定电流：${t.amps!=null?t.amps+" A":"—"}。</p>
       <button class="btn primary" id="install-save">装入</button>`);
+    rememberInstallPosition(R('#install-pos'),'protection');
     R("#install-save").onclick=()=>{
       let name=R("#install-name").value.trim()||t.name;
       let group=R("#install-group").value;
@@ -701,7 +756,7 @@ function openInstallDialog(t,e){
         writePosition(l,id,pos);
       },!0);
       VA(id);
-      pe("已装入保护 · 可在模块中设为共用空开");
+      pe("已装入支路空开 · 按安装顺序对应模块");
     };
     return;
   }
@@ -718,10 +773,11 @@ function openInstallDialog(t,e){
       ${Bt("逻辑分区",`<select id="install-group">${re([...groups.filter(r=>r.id!=="other").map(r=>[r.id,r.name]),["__new__","＋ 新建分区…"]],groupId)}</select>`)}
       ${Bt("用途说明",`<input id="install-path" value="${it(pathNow)}" maxlength="200" placeholder="例：厨房 / 台面插座">`)}
     </div>
-    ${Bt("安装位置",`<select id="install-pos">${re([["auto","自动顺延（首个空位）"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],"auto")}</select>`)}
+    ${Bt("安装位置",`<select id="install-pos">${re([["auto","自动顺延（首个空位）"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],readInstallPosition('protection',slots))}</select>`)}
     <p class="lib-preview">共 ${slots.length} 个可用位置；装入后仍可在检视器或装配页「移动」模式调整。</p>
     <button class="btn primary" id="install-save">装入设备</button>`);
     let roleSel=R("#install-role"),toggle=()=>{R("#install-branch-fields").hidden=roleSel.value==="main"};
+    rememberInstallPosition(R('#install-pos'),'protection');
     roleSel.onchange=toggle,toggle();
     R("#install-path").oninput=r=>{pathTouched=!0,pathValue=r.target.value};
     R("#install-group").onchange=r=>{
@@ -755,6 +811,21 @@ function writePosition(design,id,pos){
   design.positions&&typeof design.positions=="object"||(design.positions={});
   pos?design.positions[id]={row:pos.row,slot:pos.slot}:delete design.positions[id]
 }
+R("#clear-devices").onclick=()=>{
+  MA("清空全部设备",`<p>将移除全部空开、智能模块、端子、总开、SPD、零线排和地线排，并清除关联回路、总线、接线和安装位置。</p>
+    <p>保留项目名称、箱体配置、器件库和源表负荷。清空后可通过顶部「撤销」恢复。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" id="clear-devices-cancel">取消</button>
+      <button type="button" class="btn danger" id="clear-devices-confirm">确认清空全部设备</button>
+    </div>`);
+  R("#clear-devices-cancel").onclick=()=>R("#modal").close();
+  R("#clear-devices-confirm").onclick=()=>{
+    R("#modal").close();
+    je="Q0";EA=null;Ke=false;Ge={power:false,trip:null};
+    de(clearDevices,true);
+    pe("全部设备已清空，可通过顶部「撤销」恢复");
+  };
+};
 function cX(a){let t=kt.nodes.find(r=>r.id===a);if(!t)return;let e=t.circuit?.loadIds.length||0;MA("\u79FB\u9664\u88C5\u914D\u8BBE\u5907",`<p>${it(t.label)} \xB7 ${it(gA(t.product))}</p>
     <p>${t.role==="branch"?`\u5173\u8054\u7684 ${e} \u6761\u6E90\u8868\u8D1F\u8377\u4F1A\u4FDD\u7559\u4E3A\u5F85\u91CD\u65B0\u5206\u914D\uFF0C\u5173\u8054\u6F0F\u4FDD\u968F\u672C\u56DE\u8DEF\u4E00\u5E76\u79FB\u9664\u3002`:t.role==="main"?"\u79FB\u9664\u4E3B\u5F00\u540E\uFF0C\u672B\u7AEF\u4E0D\u518D\u63A5\u5165\u5E02\u7535\uFF0C\u62A5\u544A\u5C06\u663E\u793A\u7F3A\u5C11\u8FDB\u7EBF\u4FDD\u62A4\u3002":t.role==="module"?"将删除共享模块及其通道分配，关联回路保留。":["spd","spdBackup"].includes(t.role)?"SPD \u53CA\u5176\u540E\u5907\u4FDD\u62A4\u4F5C\u4E3A\u914D\u5957\u7EC4\u5408\u4E00\u5E76\u79FB\u9664\u3002":"\u4EC5\u79FB\u9664\u5173\u8054\u6F0F\u4FDD\uFF0C\u56DE\u8DEF\u548C\u6E90\u8868\u8D1F\u8377\u4FDD\u7559\uFF1B\u7F3A\u5C11\u6F0F\u4FDD\u5C06\u5217\u4E3A\u9700\u4FEE\u6B63\u3002"}</p>
     <button class="btn danger" id="remove-confirm">\u786E\u8BA4\u79FB\u9664</button>`),R("#remove-confirm").onclick=()=>{R("#modal").close(),de(r=>{
@@ -829,7 +900,7 @@ function openGroupManager(){
   })
 }
 function YU(a,t){let r=kt.nodes.find(s=>s.id===a);if(!r||!t||!Number.isInteger(t.slot)||t.row<0||t.row>=kt.box.rows||t.slot<0||t.slot+r.product.modules>kt.box.slots||kt.nodes.some(s=>s.id!==a&&s.row===t.row&&t.slot<s.slot+s.product.modules&&t.slot+r.product.modules>s.slot))return pe("\u76EE\u6807\u4F4D\u7F6E\u8D85\u51FA\u5BFC\u8F68\u6216\u5DF2\u6709\u5668\u4EF6");setNodePosition(a,t),VA(a)}function nn(a,t,e="application/json"){let r=URL.createObjectURL(new Blob([t],{type:e})),s=document.createElement("a");s.href=r,s.download=a,s.click(),setTimeout(()=>URL.revokeObjectURL(r),15e3)}function IX(a,t){let e=r=>{let s=String(r??"");return/^[=+\-@\t\r]/.test(s)&&(s="'"+s),'"'+s.replaceAll('"','""')+'"'};nn(a,"\uFEFF"+t.map(r=>r.map(e).join(",")).join(`\r
-`),"text/csv;charset=utf-8")}function zX(){IX("\u5168\u5C4B\u56DE\u8DEF\u8BA1\u7B97.csv",[["\u56DE\u8DEF","\u540D\u79F0","\u6E90\u6846\u67B6","\u7535\u538BV","\u76F8\u4F4D","\u5DF2\u77E5\u8D1F\u8377W","\u529F\u7387\u56E0\u6570","Ib_A","\u5668\u4EF6\u8BA2\u5355\u53F7","In_A","\u5BBD\u5EA6mm","Iz_A","\u7EBF\u7F06","\u538B\u964D\u521D\u4F30\u767E\u5206\u6BD4","\u9700\u6838\u4E8B\u9879"],...Y.circuits.map(a=>{let t=kA(Y,a);return[a.id,a.name,a.path,a.voltage,a.phase,t.p,a.pf,t.ib.toFixed(3),gA(t.product),t.product.amps,t.product.width,t.iz.toFixed(2),t.cable,t.drop.toFixed(2),Je.filter(e=>e.circuit===a.id).map(e=>e.text).join("\uFF1B")]})])}function wX(){IX("\u5168\u67DC\u7AEF\u5B50\u63A5\u7EBF\u8868.csv",[["\u8D77\u70B9","\u7EC8\u70B9","\u5BFC\u4F53","\u7EBF\u6BB5\u622A\u9762mm2","\u5BF9\u5E94\u51FA\u7BB1\u622A\u9762mm2","\u7EBF\u6750","\u7528\u9014","\u8FDE\u63A5\u72B6\u6001","\u56DE\u8DEF","\u8FC7\u8F7D\u4FDD\u62A4A","\u8FC7\u8F7D\u4FDD\u62A4\u4F4D\u7F6E","\u4E0A\u6E38\u77ED\u8DEF\u4FDD\u62A4A","\u5F85\u6838\u6761\u4EF6"],...Xe.wires.map(a=>[a.from,a.to,a.conductor,a.section,a.externalSection||"",a.material,a.scope,a.connected?"\u5DF2\u8FDE\u63A5":"\u65AD\u5F00",a.circuit||"",a.protect||"",a.conductor==="PE"?"\u4E0D\u8BBE\u5F00\u65AD\u4FDD\u62A4":a.downstreamProtection?"\u4E0B\u6E38\u65AD\u8DEF\u5668":"\u4E0A\u6E38\u65AD\u8DEF\u5668",a.shortCircuitProtect||a.protect||"",a.downstreamProtection?"\u65E0\u5206\u652F\u77ED\u63A5\u7EBF\uFF1A\u65E0\u4E2D\u9014\u5206\u63A5/\u63D2\u5EA7\u3001\u53EF\u71C3\u7269\u9694\u79BB\u3001\u5B9E\u9645\u957F\u5EA6/\u6577\u8BBE\u3001\u4E0A\u6E38\u77ED\u8DEF\u5207\u65AD\u4E0E\u70ED\u7A33\u5B9A\u672A\u6838\uFF1B\u975E\u65BD\u5DE5\u7ED3\u8BBA":"\u77ED\u8DEF\u3001\u6E29\u5347\u53CA\u73B0\u573A\u6761\u4EF6\u4ECD\u5F85\u5DE5\u7A0B\u6838\u9A8C"])])}function standaloneHtmlString(){let a=document.documentElement.cloneNode(!0);a.querySelector("#app").innerHTML="";let t=a.querySelector("#v5-print-root");t&&t.remove();let e=a.querySelector("#v5-dialog");return e&&e.remove(),a.querySelector("#embedded-design").textContent=JSON.stringify(Y).replace(/</g,"\\u003c"),`<!doctype html>
+`),"text/csv;charset=utf-8")}function zX(){IX("\u5168\u5C4B\u56DE\u8DEF\u8BA1\u7B97.csv",[["\u56DE\u8DEF","\u540D\u79F0","\u6E90\u6846\u67B6","\u7535\u538BV","\u76F8\u4F4D","\u5DF2\u77E5\u8D1F\u8377W","\u529F\u7387\u56E0\u6570","Ib_A","\u5668\u4EF6\u8BA2\u5355\u53F7","In_A","\u5BBD\u5EA6mm","Iz_A","\u7EBF\u7F06","\u538B\u964D\u521D\u4F30\u767E\u5206\u6BD4","\u9700\u6838\u4E8B\u9879"],...Y.circuits.map(a=>{let t=kA(Y,a);return[a.id,a.name,a.path,a.voltage,a.phase,t.p,a.pf,t.ib.toFixed(3),gA(t.product),t.product.amps,t.product.width,t.iz.toFixed(2),t.cable,t.drop.toFixed(2),Je.filter(e=>e.circuit===a.id).map(e=>e.text).join("\uFF1B")]})])}function wX(){const net=buildDeliveryNet(Y,kt,Xe);IX("全柜端子接线表.csv",deliveryWireRows(net,deliveryLabels(Y,net)))}function standaloneHtmlString(){let a=document.documentElement.cloneNode(!0);a.querySelector("#app").innerHTML="";let t=a.querySelector("#v5-print-root");t&&t.remove();let e=a.querySelector("#v5-dialog");return e&&e.remove(),a.querySelector("#embedded-design").textContent=JSON.stringify(Y).replace(/</g,"\\u003c"),`<!doctype html>
 `+a.outerHTML}function _U(){let a=document.documentElement.cloneNode(!0);a.querySelector("#app").innerHTML="",a.querySelector("#embedded-design").textContent=JSON.stringify(Y).replace(/</g,"\\u003c"),nn(Y.name+"-V4.html",`<!doctype html>
 `+a.outerHTML,"text/html;charset=utf-8")}function $U(){MA(isSimpleMode(Y)?"导出方案":"导出 V4 方案",`<p>${it(Y.name)} · ${Y.circuits.length} 回路 · ${(Y.modules||[]).length} 模块。导出保留当前备注与共用保护，不能作为工程合格声明。</p>
     <div class="exports"><button class="btn" id="out-html">${Ut("file-code-2")}独立 HTML</button>
@@ -845,7 +916,7 @@ function YU(a,t){let r=kt.nodes.find(s=>s.id===a);if(!r||!t||!Number.isInteger(t
 function XX(){if(!qt)return pe("\u4E09\u7EF4\u753B\u5E03\u4E0D\u53EF\u7528");let a=document.createElement("a");a.href=qt.screenshot(),a.download="\u914D\u7535\u5DE5\u574AV4.png",a.click()}function tW(){R("#print").innerHTML=`<h1>${it(Y.name)} \xB7 V4</h1><p>${kt.box.name} / ${Y.supply==="three"?"\u4E09\u76F8\u4E94\u7EBF":"\u5355\u76F8 L+N+PE"} / \u4E3B\u5F00 ${Y.mainAmps} A \u6682\u5B9A / ${Y.circuits.length} \u56DE\u8DEF</p>
     <p>\u6761\u4EF6\u6027\u65B9\u6848\u8BB0\u5F55\uFF0C\u672A\u7B7E\u8BA4\uFF0C\u4E0D\u53EF\u76F4\u63A5\u7528\u4E8E\u65BD\u5DE5\u3002${Je.filter(a=>a.level==="error").length} \u9879\u9700\u4FEE\u6B63\uFF0C${Je.filter(a=>a.level!=="error").length} \u9879\u5F85\u6838\u3002</p>
     <table><thead><tr><th>\u56DE\u8DEF</th><th>\u540D\u79F0</th><th>\u7535\u538B/\u76F8\u4F4D</th><th>\u529F\u7387W</th><th>PF</th><th>Ib / In / Iz A</th><th>\u7EBF\u7F06</th></tr></thead><tbody>${Y.circuits.map(a=>{let t=kA(Y,a);return`<tr><td>${a.id}</td><td>${it(a.name)}</td><td>${a.voltage} / ${a.phase}</td><td>${t.p}</td><td>${a.pf}</td><td>${t.ib.toFixed(1)} / ${t.product.amps} / ${t.iz.toFixed(1)}</td><td>${t.cable}</td></tr>`}).join("")}</tbody></table>
-    <p>${Je.filter(a=>a.level==="error").map(a=>it(a.text)).join("<br>")}</p>`,R("#modal").close(),window.print()}R("#close-modal").onclick=()=>R("#modal").close();R("#export").onclick=$U;R("#settings").onclick=yX;R("#snapshot").onclick=XX;R("#new-product").onclick=()=>qX();R("#source-button").onclick=()=>{if(isSimpleMode(Y)){yX();return}BA="audit",zr="sources",rs()};R("#footer-audit").onclick=()=>{BA="audit",zr="issues",rs()};R("#search").oninput=a=>{mX=a.target.value,UA()};R("#supply").onchange=a=>{let t=a.target.value;de(e=>{e.supply=t,e.mainProductId=null,e.spdProductId=null,[16,20,25,32,40,63,80].includes(e.mainAmps)||(e.mainAmps=80)},!0),t==="single"&&pe("380 V \u8BBE\u5907\u4ECD\u4FDD\u7559\u4E3A\u4E0D\u517C\u5BB9\u56DE\u8DEF\uFF0C\u4E0D\u4F1A\u9759\u9ED8\u8F6C\u6362\u4E3A 220 V")};R("#cabinet").onchange=a=>{let t=a.target.value;de(e=>{e.cabinet=t;let r=resolveCabinet(e),s=0;e.circuits.forEach(o=>{o.position&&r&&(o.position.row>=r.rows||o.position.slot>=r.slots)&&(o.position=null,s++)});let n=e.positions&&typeof e.positions=="object"?e.positions:{};for(let[o,i]of Object.entries(n))r&&(i.row>=r.rows||i.slot>=r.slots)&&(delete n[o],s++);e.positions=n,s&&setTimeout(()=>pe(`${s} 个器件的固定位置超出新箱体，已改为自动排布`),50)})};R("#custom-cabinet").onclick=()=>openCustomCabinetDialog();R("#design-templates").onclick=()=>openDesignTemplatesDialog();R("#manage-groups").onclick=()=>openGroupManager();R("#save-as-template").onclick=()=>openSaveAsTemplateDialog();R("#undo").onclick=()=>{Aa.length&&(sn.push(ea(Y)),Y=Aa.pop(),Ge.trip=null,Y1(),ra())};R("#redo").onclick=()=>{sn.length&&(Aa.push(ea(Y)),Y=sn.pop(),Ge.trip=null,Y1(),ra())};document.querySelectorAll("[data-tab]").forEach(a=>a.onclick=()=>{BA=a.dataset.tab,rs(),qt?.resize()});document.querySelectorAll("[data-left]").forEach(a=>a.onclick=()=>{pr=a.dataset.left,UA()});document.querySelectorAll("[data-mode]").forEach(a=>a.onclick=()=>{_a=a.dataset.mode,qt?.setMode(_a),qt&&(qt.moving=!1,qt.setPanMode(!1)),R("#pan-mode").classList.remove("active"),R("#move-mode").classList.remove("active"),R("#select-mode").classList.add("active"),document.querySelectorAll("[data-mode]").forEach(t=>t.classList.toggle("active",t.dataset.mode===_a))});R("#select-mode").onclick=()=>{qt&&(qt.moving=!1,qt.setPanMode(!1)),R("#pan-mode").classList.remove("active"),R("#select-mode").classList.add("active"),R("#move-mode").classList.remove("active")};R("#move-mode").onclick=()=>{qt&&(Ke=!1,cr=!1,WA(),qt.setPanMode(!1),R("#pan-mode").classList.remove("active"),_a="front",qt.setMode(_a),qt.moving=!qt.moving,R("#move-mode").classList.toggle("active",qt.moving),R("#select-mode").classList.toggle("active",!qt.moving),document.querySelectorAll("[data-mode]").forEach(a=>a.classList.toggle("active",a.dataset.mode===_a)))};R("#focus").onclick=()=>qt?.fit(!0);R("#inspect-only").onclick=()=>{Ke=!Ke,WA(),qt?.fit(Ke)};R("#fit").onclick=()=>{Ke=!1,hr=1,R("#zoom-value").textContent="100%",qt?.setZoom(1),WA(),qt?.fit()};R("#pan-mode").onclick=()=>{qt&&(qt.setPanMode(!qt.panMode),R("#pan-mode").classList.toggle("active",qt.panMode),R("#move-mode").classList.remove("active"),R("#select-mode").classList.toggle("active",!qt.panMode))};R("#explode").onclick=()=>{cr=!cr,cr&&wr===0&&(wr=1),WA()};R("#explode-range").oninput=a=>{wr=+a.target.value/100,WA(),qt?.fit(Ke)};R("#door").onclick=()=>{Bo=!Bo,R("#door").classList.toggle("active",Bo),WA()};R("#wire-mode").onchange=a=>{vX=a.target.value,WA()};R("#quality").onchange=a=>{pX=a.target.value,qt?.setQuality(pX)};var Nu={top:!1,bottom:!1};try{Nu=Object.assign(Nu,JSON.parse(localStorage.getItem("panel-studio-chrome")||"{}"))}catch{}function zU(){let a=R(".canvas-wrap");a&&(a.classList.toggle("chrome-hide-top",!!Nu.top),a.classList.toggle("chrome-hide-bottom",!!Nu.bottom));let t=R("#chrome-top"),e=R("#chrome-bottom");t&&(t.classList.toggle("active",!!Nu.top),t.title=Nu.top?"\u663E\u793A\u9876\u90E8\u673A\u67DC\u4FE1\u606F":"\u9690\u85CF\u9876\u90E8\u673A\u67DC\u4FE1\u606F",t.setAttribute("aria-label",t.title),t.setAttribute("aria-pressed",String(!!Nu.top))),e&&(e.classList.toggle("active",!!Nu.bottom),e.title=Nu.bottom?"\u663E\u793A\u5E95\u90E8\u7EC4\u4EF6\u6761":"\u9690\u85CF\u5E95\u90E8\u7EC4\u4EF6\u6761",e.setAttribute("aria-label",e.title),e.setAttribute("aria-pressed",String(!!Nu.bottom)));try{localStorage.setItem("panel-studio-chrome",JSON.stringify(Nu))}catch{}qt?.resize()}R("#chrome-top").onclick=()=>{Nu.top=!Nu.top,zU(),qt?.fit(Ke)};R("#chrome-bottom").onclick=()=>{Nu.bottom=!Nu.bottom,zU(),qt?.fit(Ke)};zU();R("#theme").onclick=()=>{Ya=Ya==="dark"?"light":"dark",R(".canvas-wrap").classList.toggle("studio-dark",Ya==="dark"),R("#theme").innerHTML=Ut(Ya==="dark"?"sun":"moon"),R("#theme").title=Ya==="dark"?"\u5207\u6362\u6D45\u8272\u5DE5\u4F5C\u53F0":"\u5207\u6362\u6DF1\u8272\u5DE5\u4F5C\u53F0",qt?.setTheme(Ya),Ye()};R("#zoom-plus").onclick=()=>{hr=Math.min(3,Math.round((hr+.15)*100)/100),qt?.setZoom(hr),R("#zoom-value").textContent=Math.round(hr*100)+"%"};R("#zoom-minus").onclick=()=>{hr=Math.max(.5,Math.round((hr-.15)*100)/100),qt?.setZoom(hr),R("#zoom-value").textContent=Math.round(hr*100)+"%"};R("#auto-wire").onclick=()=>{MA("\u6062\u590D\u81EA\u52A8\u914D\u7EBF",'<p>\u5C06\u6E05\u9664\u624B\u52A8\u5668\u4EF6\u9009\u62E9\u3001\u7EBF\u5F84\u8986\u76D6\u4E0E\u65AD\u7EBF\u8BD5\u9A8C\u72B6\u6001\uFF1B\u4FDD\u7559\u8BBE\u5907\u529F\u7387\u3001\u529F\u7387\u56E0\u6570\u3001\u6577\u8BBE\u6761\u4EF6\u548C\u5F53\u524D\u56DE\u8DEF\u5206\u914D\u3002</p><button class="btn primary" id="confirm-auto">\u6062\u590D\u81EA\u52A8\u503C</button>'),R("#confirm-auto").onclick=()=>{R("#modal").close(),de(a=>{a.circuits.forEach(t=>{t.wire=null,t.productId=null})},!0),pe("\u5DF2\u6062\u590D\u81EA\u52A8\u5339\u914D\uFF1B\u5F85\u6838\u6761\u4EF6\u4ECD\u4FDD\u7559")}};R("#balance").onclick=()=>{MA("\u5747\u8861\u5355\u76F8\u56DE\u8DEF",'<p>\u6309\u56DE\u8DEF\u5DF2\u77E5\u8BBE\u8BA1\u7535\u6D41\u91CD\u65B0\u5206\u914D L1 / L2 / L3\uFF0C\u4E0D\u6539\u53D8 380V \u4E09\u76F8\u56DE\u8DEF\u3002\u8FDE\u63A5\u5C06\u91CD\u65B0\u751F\u6210\uFF0C\u65AD\u7EBF\u8BD5\u9A8C\u4E0E\u5BFC\u7EBF\u8986\u76D6\u503C\u4F1A\u6E05\u9664\uFF1B\u4E09\u6B21\u8C10\u6CE2\u4E2D\u6027\u7EBF\u7535\u6D41\u4E0D\u5728\u672C\u6A21\u578B\u8BA1\u7B97\u8303\u56F4\u3002</p><button class="btn primary" id="confirm-balance">\u91CD\u65B0\u5747\u8861</button>'),R("#confirm-balance").onclick=()=>{R("#modal").close(),de(a=>N1(a),!0)}};R("#power")?.addEventListener("change",a=>{Ge.power=a.target.checked,Ge.trip=null,ra()});R("#mobile-left").onclick=()=>{R(".left").classList.toggle("open"),R(".right").classList.remove("open")};R("#mobile-right").onclick=()=>{R(".right").classList.toggle("open"),R(".left").classList.remove("open")};R("#canvas").addEventListener("pointerdown",()=>{R(".left").classList.remove("open"),R(".right").classList.remove("open")});R("#import").onclick=()=>R("#file").click();R("#file").onchange=async a=>{let t=a.target.files[0];if(a.target.value="",!!t){if(t.size>3e6)return pe("JSON \u65B9\u6848\u4E0D\u80FD\u8D85\u8FC7 3 MB");try{let e=_s(JSON.parse(await t.text()));$s(e),de(r=>Object.assign(r,e)),Ge={power:!1,trip:null},je=Y.circuits[0]?.id,EA=null,ra(),pe("\u5DF2\u5BFC\u5165 V2 \u65B9\u6848")}catch(e){pe("\u5BFC\u5165\u5931\u8D25\uFF1A"+e.message)}}};document.addEventListener("keydown",a=>{R("#modal").open||a.target.closest("input,select,textarea")||((a.metaKey||a.ctrlKey)&&a.key.toLowerCase()==="z"&&(a.preventDefault(),R(a.shiftKey?"#redo":"#undo").click()),a.key==="Escape"&&(R(".left").classList.remove("open"),R(".right").classList.remove("open"),EA=null,As()))});function positionPanel(id){
+    <p>${Je.filter(a=>a.level==="error").map(a=>it(a.text)).join("<br>")}</p>`,R("#modal").close(),window.print()}R("#close-modal").onclick=()=>R("#modal").close();R("#export").onclick=$U;R("#settings").onclick=yX;R("#snapshot").onclick=XX;R("#new-product").onclick=()=>qX();R("#source-button").onclick=()=>{if(isSimpleMode(Y)){yX();return}BA="audit",zr="sources",rs()};R("#footer-audit").onclick=()=>{BA="audit",zr="issues",rs()};R("#search").oninput=a=>{mX=a.target.value,UA()};R("#supply").onchange=a=>{let t=a.target.value;de(e=>{e.supply=t,e.mainProductId=null,e.spdProductId=null,[16,20,25,32,40,63,80].includes(e.mainAmps)||(e.mainAmps=80)},!0),t==="single"&&pe("380 V \u8BBE\u5907\u4ECD\u4FDD\u7559\u4E3A\u4E0D\u517C\u5BB9\u56DE\u8DEF\uFF0C\u4E0D\u4F1A\u9759\u9ED8\u8F6C\u6362\u4E3A 220 V")};R("#cabinet").onchange=a=>{let t=a.target.value;de(e=>{e.cabinet=t;let r=resolveCabinet(e),s=0;e.circuits.forEach(o=>{o.position&&r&&(o.position.row>=r.rows||o.position.slot>=r.slots)&&(o.position=null,s++)});let n=e.positions&&typeof e.positions=="object"?e.positions:{};for(let[o,i]of Object.entries(n))r&&(i.row>=r.rows||i.slot>=r.slots)&&(delete n[o],s++);e.positions=n,s&&setTimeout(()=>pe(`${s} 个器件的固定位置超出新箱体，已改为自动排布`),50)})};R("#custom-cabinet").onclick=()=>openCustomCabinetDialog();R("#design-templates").onclick=()=>openDesignTemplatesDialog();R("#manage-groups").onclick=()=>openGroupManager();R("#save-as-template").onclick=()=>openSaveAsTemplateDialog();R("#undo").onclick=()=>{Aa.length&&(sn.push(ea(Y)),Y=Aa.pop(),Ge.trip=null,Y1(),ra())};R("#redo").onclick=()=>{sn.length&&(Aa.push(ea(Y)),Y=sn.pop(),Ge.trip=null,Y1(),ra())};document.querySelectorAll("[data-tab]").forEach(a=>a.onclick=()=>{BA=a.dataset.tab,rs(),qt?.resize()});document.querySelectorAll("[data-left]").forEach(a=>a.onclick=()=>{pr=a.dataset.left,UA()});document.querySelectorAll("[data-mode]").forEach(a=>a.onclick=()=>{_a=a.dataset.mode,qt?.setMode(_a),qt&&(qt.moving=!1,qt.setPanMode(!1)),R("#pan-mode").classList.remove("active"),R("#move-mode").classList.remove("active"),R("#select-mode").classList.add("active"),document.querySelectorAll("[data-mode]").forEach(t=>t.classList.toggle("active",t.dataset.mode===_a))});R("#select-mode").onclick=()=>{qt&&(qt.moving=!1,qt.setPanMode(!1)),R("#pan-mode").classList.remove("active"),R("#select-mode").classList.add("active"),R("#move-mode").classList.remove("active")};R("#move-mode").onclick=()=>{qt&&(Ke=!1,cr=!1,WA(),qt.setPanMode(!1),R("#pan-mode").classList.remove("active"),_a="front",qt.setMode(_a),qt.moving=!qt.moving,R("#move-mode").classList.toggle("active",qt.moving),R("#select-mode").classList.toggle("active",!qt.moving),document.querySelectorAll("[data-mode]").forEach(a=>a.classList.toggle("active",a.dataset.mode===_a)))};R("#focus").onclick=()=>qt?.fit(!0);R("#inspect-only").onclick=()=>{Ke=!Ke,WA(),qt?.fit(Ke)};R("#fit").onclick=()=>{Ke=!1,hr=1,R("#zoom-value").textContent="100%",qt?.setZoom(1),WA(),qt?.fit()};R("#pan-mode").onclick=()=>{qt&&(qt.setPanMode(!qt.panMode),R("#pan-mode").classList.toggle("active",qt.panMode),R("#move-mode").classList.remove("active"),R("#select-mode").classList.toggle("active",!qt.panMode))};R("#explode").onclick=()=>{cr=!cr,WA()};R("#door").onclick=()=>{Bo=!Bo,R("#door").classList.toggle("active",Bo),WA()};R("#wire-mode").onchange=a=>{vX=a.target.value,WA()};R("#quality").onchange=a=>{pX=a.target.value,qt?.setQuality(pX)};var Nu={top:!1,bottom:!1};try{Nu=Object.assign(Nu,JSON.parse(localStorage.getItem("panel-studio-chrome")||"{}"))}catch{}function zU(){let a=R(".canvas-wrap");a&&(a.classList.toggle("chrome-hide-top",!!Nu.top),a.classList.toggle("chrome-hide-bottom",!!Nu.bottom));let t=R("#chrome-top"),e=R("#chrome-bottom");t&&(t.classList.toggle("active",!!Nu.top),t.title=Nu.top?"\u663E\u793A\u9876\u90E8\u673A\u67DC\u4FE1\u606F":"\u9690\u85CF\u9876\u90E8\u673A\u67DC\u4FE1\u606F",t.setAttribute("aria-label",t.title),t.setAttribute("aria-pressed",String(!!Nu.top))),e&&(e.classList.toggle("active",!!Nu.bottom),e.title=Nu.bottom?"\u663E\u793A\u5E95\u90E8\u7EC4\u4EF6\u6761":"\u9690\u85CF\u5E95\u90E8\u7EC4\u4EF6\u6761",e.setAttribute("aria-label",e.title),e.setAttribute("aria-pressed",String(!!Nu.bottom)));try{localStorage.setItem("panel-studio-chrome",JSON.stringify(Nu))}catch{}qt?.resize()}R("#chrome-top").onclick=()=>{Nu.top=!Nu.top,zU(),qt?.fit(Ke)};R("#chrome-bottom").onclick=()=>{Nu.bottom=!Nu.bottom,zU(),qt?.fit(Ke)};zU();R("#theme").onclick=()=>{Ya=Ya==="dark"?"light":"dark",R(".canvas-wrap").classList.toggle("studio-dark",Ya==="dark"),R("#theme").innerHTML=Ut(Ya==="dark"?"sun":"moon"),R("#theme").title=Ya==="dark"?"\u5207\u6362\u6D45\u8272\u5DE5\u4F5C\u53F0":"\u5207\u6362\u6DF1\u8272\u5DE5\u4F5C\u53F0",qt?.setTheme(Ya),Ye()};R("#zoom-plus").onclick=()=>{hr=Math.min(3,Math.round((hr+.15)*100)/100),qt?.setZoom(hr),R("#zoom-value").textContent=Math.round(hr*100)+"%"};R("#zoom-minus").onclick=()=>{hr=Math.max(.5,Math.round((hr-.15)*100)/100),qt?.setZoom(hr),R("#zoom-value").textContent=Math.round(hr*100)+"%"};R("#auto-wire").onclick=()=>{MA("\u6062\u590D\u81EA\u52A8\u914D\u7EBF",'<p>\u5C06\u6E05\u9664\u624B\u52A8\u5668\u4EF6\u9009\u62E9\u3001\u7EBF\u5F84\u8986\u76D6\u4E0E\u65AD\u7EBF\u8BD5\u9A8C\u72B6\u6001\uFF1B\u4FDD\u7559\u8BBE\u5907\u529F\u7387\u3001\u529F\u7387\u56E0\u6570\u3001\u6577\u8BBE\u6761\u4EF6\u548C\u5F53\u524D\u56DE\u8DEF\u5206\u914D\u3002</p><button class="btn primary" id="confirm-auto">\u6062\u590D\u81EA\u52A8\u503C</button>'),R("#confirm-auto").onclick=()=>{R("#modal").close(),de(a=>{a.circuits.forEach(t=>{t.wire=null,t.productId=null})},!0),pe("\u5DF2\u6062\u590D\u81EA\u52A8\u5339\u914D\uFF1B\u5F85\u6838\u6761\u4EF6\u4ECD\u4FDD\u7559")}};R("#balance").onclick=()=>{MA("\u5747\u8861\u5355\u76F8\u56DE\u8DEF",'<p>\u6309\u56DE\u8DEF\u5DF2\u77E5\u8BBE\u8BA1\u7535\u6D41\u91CD\u65B0\u5206\u914D L1 / L2 / L3\uFF0C\u4E0D\u6539\u53D8 380V \u4E09\u76F8\u56DE\u8DEF\u3002\u8FDE\u63A5\u5C06\u91CD\u65B0\u751F\u6210\uFF0C\u65AD\u7EBF\u8BD5\u9A8C\u4E0E\u5BFC\u7EBF\u8986\u76D6\u503C\u4F1A\u6E05\u9664\uFF1B\u4E09\u6B21\u8C10\u6CE2\u4E2D\u6027\u7EBF\u7535\u6D41\u4E0D\u5728\u672C\u6A21\u578B\u8BA1\u7B97\u8303\u56F4\u3002</p><button class="btn primary" id="confirm-balance">\u91CD\u65B0\u5747\u8861</button>'),R("#confirm-balance").onclick=()=>{R("#modal").close(),de(a=>N1(a),!0)}};R("#power")?.addEventListener("change",a=>{Ge.power=a.target.checked,Ge.trip=null,ra()});R("#mobile-left").onclick=()=>{R(".left").classList.toggle("open"),R(".right").classList.remove("open")};R("#mobile-right").onclick=()=>{R(".right").classList.toggle("open"),R(".left").classList.remove("open")};R("#canvas").addEventListener("pointerdown",()=>{R(".left").classList.remove("open"),R(".right").classList.remove("open")});R("#import").onclick=()=>R("#file").click();R("#file").onchange=async a=>{let t=a.target.files[0];if(a.target.value="",!!t){if(t.size>3e6)return pe("JSON \u65B9\u6848\u4E0D\u80FD\u8D85\u8FC7 3 MB");try{let e=_s(JSON.parse(await t.text()));$s(e),de(r=>Object.assign(r,e)),Ge={power:!1,trip:null},je=Y.circuits[0]?.id,EA=null,ra(),pe("\u5DF2\u5BFC\u5165 V2 \u65B9\u6848")}catch(e){pe("\u5BFC\u5165\u5931\u8D25\uFF1A"+e.message)}}};document.addEventListener("keydown",a=>{R("#modal").open||a.target.closest("input,select,textarea")||((a.metaKey||a.ctrlKey)&&a.key.toLowerCase()==="z"&&(a.preventDefault(),R(a.shiftKey?"#redo":"#undo").click()),a.key==="Escape"&&(R(".left").classList.remove("open"),R(".right").classList.remove("open"),EA=null,As()))});function positionPanel(id){
   let node=kt.nodes.find(n=>n.id===id);
   if(!node)return"";
   let pinned=!!nodePosition(Y,id,node.circuit),

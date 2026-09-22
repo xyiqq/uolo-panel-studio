@@ -59,7 +59,7 @@ export function makeSmartProduct(fields) {
     depth: Number.isFinite(fields.depth) ? fields.depth : null,
     modules: hasDim ? fields.modules : null,
     color: fields.color ?? KIND_COLOR[kind] ?? "#6a7580",
-    availability: hasDim ? VERIFIED_DIM : PENDING,
+    availability: fields.availability ?? (hasDim ? VERIFIED_DIM : PENDING),
     source: fields.source ?? { ...PENDING_SOURCE },
     smart: fields.smart ?? true,
     terminalColor: fields.terminalColor ?? null,

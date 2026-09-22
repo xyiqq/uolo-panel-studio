@@ -4,6 +4,7 @@
 .terminal-editor .terminal-status.error{color:#af3f32}
 .terminal-editor .table-wrap input{width:140px;max-width:100%}
 .terminal-editor .table-wrap select{max-width:220px}
+.terminal-editor [data-sequence-prompt],.terminal-editor [data-batch-prompt]{white-space:normal;max-width:220px;line-height:1.6}
 .terminal-preview{margin-top:22px;overflow:auto;border-top:1px solid #cbd8d0}
 .terminal-preview svg{display:block;width:100%;min-width:640px}
 .nav{overflow-x:auto}

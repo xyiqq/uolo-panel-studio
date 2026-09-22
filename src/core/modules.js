@@ -198,11 +198,11 @@ export function normalizeModules(design, findProduct) {
 }
 
 
-/** Compact unpinned module groups so terminals sit directly after their relay. */
+/** Place automatic modules in the first available slots, independent of wiring links. */
 export function compactModulePlacement(assembly, design) {
   if (!assembly?.nodes || !assembly?.box) return assembly;
   const nodes = assembly.nodes.filter((node) => node.role === "module" && node.module);
-  if (nodes.length < 2) return assembly;
+  if (!nodes.length) return assembly;
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const span = (p) => Math.max(1, Math.ceil(Number(p?.modules) || Math.ceil((Number(p?.width) || 18) / 18)));
   const width = (p) => Number(p?.width) > 0 ? p.width : span(p) * 18;
@@ -219,65 +219,21 @@ export function compactModulePlacement(assembly, design) {
   const can = (n, p) => Number.isInteger(p?.row) && Number.isInteger(p?.slot) && p.row >= 0 && p.row < rows && p.slot >= 0 && p.slot + span(n.product) <= slots && occupied[p.row].slice(p.slot, p.slot + span(n.product)).every((v) => !v || v === n.id);
   const put = (n, p) => { if (!p || !can(n, p)) { n.overflow = true; n.placementError = true; n.row = rows; n.slot = 0; return false; } for (let i = 0; i < span(n.product); i++) occupied[p.row][p.slot + i] = n.id; Object.assign(n, p, { overflow: false, placementError: false }); placed.set(n.id, p); return true; };
   const free = (n) => { for (let r = 0; r < rows; r++) for (let s = 0; s < slots; s++) if (can(n, { row: r, slot: s })) return { row: r, slot: s }; return null; };
-  const terminals = new Map(); let previous = null;
-  for (const n of ordered) { if (n.product?.kind === "terminal") { const anchor = (n.module.linkModuleId && byId.get(n.module.linkModuleId)) || previous; if (anchor) (terminals.get(anchor.id) || (terminals.set(anchor.id, []), terminals.get(anchor.id))).push(n); } else previous = n; }
-  const anchoredTerminals = new Set([...terminals.values()].flat().map((n) => n.id));
-  const done = new Set();
   for (const n of ordered) {
-    if (!n || done.has(n.id)) continue;
-    if (n.product?.kind === "terminal") {
-      // Keep standalone terminals in module order before placing later modules.
-      if (anchoredTerminals.has(n.id)) continue;
-      done.add(n.id);
-      if (!n.pinned && !placed.has(n.id)) put(n, free(n));
-      continue;
-    }
-    done.add(n.id);
     if (!n.pinned && !placed.has(n.id)) put(n, free(n));
-    const anchor = placed.get(n.id);
-    for (const t of terminals.get(n.id) || []) {
-      done.add(t.id);
-      if (t.pinned || placed.has(t.id)) continue;
-      const preferred = anchor && { row: anchor.row, slot: anchor.slot + span(n.product) };
-      put(t, preferred && can(t, preferred) ? preferred : free(t));
-    }
   }
-  for (const n of ordered) if (n && !done.has(n.id) && !n.pinned && !placed.has(n.id)) { done.add(n.id); put(n, free(n)); }
   for (const n of nodes) if (!n.overflow) { n.x = (n.slot - slots / 2) * 18 + width(n.product) / 2; n.y = assembly.box.height / 2 - assembly.box.topRail - n.row * assembly.box.pitch; }
-  // 端子按真实外形宽度首尾贴合，避免 5.2/20.8mm 端子被整数 DIN 槽位拉开。
-  let previousTerminal = null;
-  for (const n of ordered) {
-    if (!n || n.overflow || n.product?.kind !== "terminal") {
-      if (n && n.product?.kind !== "terminal") previousTerminal = null;
-      continue;
-    }
-    if (previousTerminal && !n.pinned && !previousTerminal.overflow && previousTerminal.row === n.row) {
-      n.x = previousTerminal.x + width(previousTerminal.product) / 2 + width(n.product) / 2;
-      n.y = previousTerminal.y;
-    }
-    previousTerminal = n;
-  }
-  // 以实际槽位顺序检查端子与相邻设备，端子贴到前一个设备的右边界。
+  // 相邻槽位的同类器件（端子或非端子模块，包括手动定位）按真实宽度贴合；保留每段首器件的定位。
+  // row/slot 与 occupied 仍表示安装槽位预留，x 表示实际器件中心；空槽或其它设备会断开贴合。
   for (let r = 0; r < rows; r++) {
     const line = nodes.filter((n) => !n.overflow && n.row === r).sort((a, b) => a.slot - b.slot);
     for (let i = 1; i < line.length; i++) {
       const prev = line[i - 1], cur = line[i];
-      if (prev.product?.kind === "terminal" || cur.product?.kind === "terminal") {
+      const samePlacementGroup = (prev.product?.kind === "terminal") === (cur.product?.kind === "terminal");
+      if (samePlacementGroup && cur.slot === prev.slot + span(prev.product)) {
         cur.x = prev.x + width(prev.product) / 2 + width(cur.product) / 2;
         cur.y = prev.y;
       }
-    }
-  }
-  // 端子跟随模块时同样以真实宽度贴合，而不是以槽位中心对齐。
-  for (const [anchorId, terms] of terminals) {
-    const anchor = byId.get(anchorId);
-    if (!anchor || anchor.overflow) continue;
-    let previous = anchor;
-    for (const t of terms) {
-      if (t.pinned || t.overflow || previous.overflow || previous.row !== t.row) { previous = t; continue; }
-      t.x = previous.x + width(previous.product) / 2 + width(t.product) / 2;
-      t.y = previous.y;
-      previous = t;
     }
   }
   return assembly;
@@ -300,6 +256,8 @@ export function normalizeBuses(design) {
       psuModuleIds: Array.isArray(b.psuModuleIds) ? b.psuModuleIds.filter(Boolean) : [],
       deviceModuleIds: Array.isArray(b.deviceModuleIds) ? b.deviceModuleIds.filter(Boolean) : [],
       voltage: Number.isFinite(b.voltage) ? b.voltage : null,
+      section: typeof b.section==='string'?b.section.trim().slice(0,80):Number.isFinite(b.section)&&b.section>0?b.section:null,
+      cableMeters:Number.isFinite(b.cableMeters)&&b.cableMeters>=0?b.cableMeters:null,
       budgetUnit: b.budgetUnit === "W" ? "W" : "mA",
       capacity: Number.isFinite(b.capacity) ? b.capacity : null,
       maxDevices: Number.isFinite(b.maxDevices) ? b.maxDevices : null,
@@ -337,7 +295,9 @@ export function syncCircuitDevices(design, findProduct) {
       if (c.rcdProductId) base.push({ role: "rcd", productId: c.rcdProductId });
     }
     const extras = byCircuit.get(c.id) || [];
-    extras.sort((a, b) => a.channel - b.channel || a.moduleId.localeCompare(b.moduleId));
+    const saved=new Map((c.devices||[]).filter(d=>d.moduleId).map((d,i)=>[`${d.moduleId}:${d.channel}`,i]));
+    extras.sort((a,b)=>(saved.get(`${a.moduleId}:${a.channel}`)??Infinity)-(saved.get(`${b.moduleId}:${b.channel}`)??Infinity)
+      || (a.role==='meter')-(b.role==='meter') || a.channel-b.channel || a.moduleId.localeCompare(b.moduleId));
     c.devices = [...base, ...extras];
   }
   return design;

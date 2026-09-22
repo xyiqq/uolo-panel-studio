@@ -28,7 +28,7 @@ export function buildPortTemplates(product) {
 
   if (["relay", "dimmer", "contactor", "timer"].includes(kind)) {
     add("L_IN", "L", "top", "in");
-    add("N_IN", "N", "top", "in");
+    if(product.id !== 'crestron-din-8sw8-i') add("N_IN", "N", "top", "in");
     const ch = product.channels || 1;
     for (let i = 1; i <= ch; i++) {
       add(`CH${i}_IN`, "L", "top", "in", i);
@@ -55,6 +55,10 @@ export function buildPortTemplates(product) {
   }
 
   if (kind === "gateway") {
+    if (/24vdc|dc24/i.test(product.powerInput || '')) {
+      add("DC+", "DC+", "top", "in");
+      add("DC-", "DC-", "top", "in");
+    }
     if (product.powerInput === "LN") {
       add("L_IN", "L", "top", "in");
       add("N_IN", "N", "top", "in");

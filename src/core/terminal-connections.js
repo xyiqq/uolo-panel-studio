@@ -5,7 +5,7 @@ export function terminalRows(design, resolve) {
     const p = resolve(m.productId);
     if (p?.kind !== 'terminal') return [];
     return Array.from({length: p.poles || p.channels || 1}, (_, i) => ({
-      loadName: '', loadType: 'light', output: '', section: '', wireNo: '',
+      loadName: '', loadType: 'light', output: '', section: 1.5, wireNo: '',
       ...m.terminalConnections?.[i + 1],
       terminalId: m.id, pole: i + 1, color: p.terminalColor,
     }));
@@ -20,6 +20,35 @@ export function outputOptions(design, resolve) {
     }));
   });
 }
+// Follow the displayed module/channel order, without replacing existing wiring.
+export function sequentialTerminalRows(rows, outputs, terminalId) {
+  const first = rows.find(r => r.terminalId === terminalId && r.pole === 1);
+  const start = outputs.findIndex(o => o.value === first?.output);
+  const next = rows.map(r => ({...r}));
+  if (!first?.output || first.color === 'blue' || start < 0) return {rows: next, count: 0};
+  const used = new Set(rows.map(r => r.output).filter(Boolean));
+  const available = outputs.slice(start + 1).filter(o => !used.has(o.value));
+  const targets = next.filter(r => r.terminalId === terminalId && r.pole > 1 && !r.output && r.color !== 'blue')
+    .sort((a,b) => a.pole - b.pole);
+  const count = Math.min(targets.length, available.length);
+  for (let i = 0; i < count; i++) targets[i].output = available[i].value;
+  return {rows: next, count};
+}
+export function sequentialWireNumbers(rows, terminalId) {
+  const first=rows.find(r=>r.terminalId===terminalId&&r.pole===1);
+  const match=/^(.*?)(\d+)$/.exec(String(first?.wireNo||'').trim());
+  if(!match) return {rows,count:0};
+  const next=rows.map(r=>({...r})),used=new Set(rows.map(r=>String(r.wireNo||'').trim()).filter(Boolean));
+  let number=BigInt(match[2]),count=0;
+  for(const row of next.filter(r=>r.terminalId===terminalId&&r.pole>1&&!String(r.wireNo||'').trim()).sort((a,b)=>a.pole-b.pole)) {
+    let name;
+    do {number++;name=match[1]+String(number).padStart(match[2].length,'0');} while(used.has(name));
+    if(name.length>40) break;
+    row.wireNo=name;used.add(name);count++;
+  }
+  return {rows:next,count};
+}
+
 export function saveTerminalRows(design, rows, resolve) {
   const known = new Map(terminalRows(design, resolve).map(r => [`${r.terminalId}:${r.pole}`,r]));
   const outputs = new Set(outputOptions(design, resolve).map(o => o.value));
@@ -50,7 +79,7 @@ export function terminalCsv(rows) {
 }
 
 // Dedicated design wires: do not invent feed, neutral, motor interlocks or energization.
-export function terminalWireSegments(design, assembly, resolve) {
+export function terminalWireSegments(design, assembly, resolve, net) {
   const nodes = new Map(assembly.nodes.map(n => [n.id,n]));
   const segments = [];
   for (const r of terminalRows(design, resolve)) {
@@ -63,11 +92,15 @@ export function terminalWireSegments(design, assembly, resolve) {
     const y = term.y;
     const ch = +match[2];
     if (ch < 1 || ch > output.product.channels || r.color === 'blue') continue;
-    const source = {x:output.x-output.product.width/2+ch*output.product.width/(output.product.channels+1),y:output.y-output.product.height/2,z:output.product.depth+5};
+    let source = {x:output.x-output.product.width/2+ch*output.product.width/(output.product.channels+1),y:output.y-output.product.height/2,z:output.product.depth+5};
     const target = {x,y:y-term.product.height/2,z:term.product.depth+5};
     const circuit=design.circuits?.find(c=>c.id===output.module?.channels?.[ch]);
+    const chainEnd=net?.wires.find(w=>w.circuit===circuit?.id&&circuit&&w.scope==='模块链 → 出箱端子');
+    const physicalOutput=chainEnd?.from||r.output;
+    const actualPort=net?.ports?.[physicalOutput];
+    if(actualPort) source={x:actualPort.x,y:actualPort.y,z:actualPort.z};
     const fieldName=output.module?.channelLabels?.[ch] || circuit?.name || r.loadName || `${output.module?.displayName||output.label||output.id} CH${ch}`;
-    segments.push({id:`${r.terminalId}:${r.pole}`, ...r, fieldName, source, target,
+    segments.push({id:`${r.terminalId}:${r.pole}`, ...r, physicalOutput, replacedWireId:chainEnd?.id, fieldName, source, target,
       field:{x,y:y+term.product.height/2,z:term.product.depth+5}});
   }
   return segments;

@@ -25,6 +25,8 @@ docker compose -f docker/docker-compose.yml up --build
 
 ## 阶段状态
 
+当前完成范围、限制和下一阶段验收请以 [后续开发计划](docs/DEVELOPMENT_PLAN.md) 为准。以下阶段表仅表示已建立相应模块，不代表原规格所有任务已完成。
+
 | 阶段 | 内容 |
 |------|------|
 | P0 | Vite 工程、领域黄金回归、UI、Studio3D |

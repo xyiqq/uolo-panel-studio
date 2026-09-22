@@ -17,13 +17,14 @@ describe("smart products catalog", () => {
       expect(p.width).toBeGreaterThan(0);
       expect(p.height).toBeGreaterThan(0);
       expect(p.depth).toBeGreaterThan(0);
-      expect(p.availability).toBe(VERIFIED_DIM);
+      expect(p.availability).toBeTruthy();
+      if (p.availability === VERIFIED_DIM) expect(p.source.url).toMatch(/^https:\/\//);
       expect(isSmartVisual(p)).toBe(true);
       expect(p.amps == null || Number.isFinite(p.amps)).toBe(true);
     }
     const dali = SMART_PRODUCTS.find((p) => p.id === "crestron-din-dali-2");
     expect(dali.modules).toBe(9);
-    expect(dali.width).toBe(162);
+    expect(dali.width).toBe(159);
     const dli = SMART_PRODUCTS.find((p) => p.id === "crestron-din-dli");
     expect(dli.modules).toBe(3);
     expect(dli.width).toBe(52.83);
