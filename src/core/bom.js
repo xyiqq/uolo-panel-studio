@@ -34,7 +34,7 @@ function wireLengthMeters(net, wire) {
 }
 
 function addItem(map, item) {
-  const key = item.sku || item.name;
+  const key = `${item.brand || ""}|${item.sku || item.name}`;
   const prev = map.get(key);
   if (prev) {
     prev.qty += item.qty;
@@ -42,6 +42,20 @@ function addItem(map, item) {
   } else {
     map.set(key, { ...item });
   }
+}
+
+/** Compacted assemblies pack sub-module terminals by millimetre, so count whole 18 mm gaps per row. */
+function blankSlots(assembly) {
+  const box = assembly?.box;
+  const rows = box?.rows || 0, slots = box?.slots || 0;
+  const footprints = assembly?.occupied?.footprints;
+  if (!footprints) return Math.max(0, rows * slots - (assembly?.modules || 0));
+  let blank = 0;
+  for (let row = 0; row < rows; row++) {
+    const used = footprints.filter((f) => f.row === row).reduce((sum, f) => sum + (f.right - f.left), 0);
+    blank += Math.max(0, Math.floor((slots * 18 - used + 1e-6) / 18));
+  }
+  return blank;
 }
 
 /**
@@ -127,9 +141,7 @@ export function buildBom(design, assembly, net) {
   }
 
   // 盖板：空模位
-  const totalSlots = (box?.rows || 0) * (box?.slots || 0);
-  const used = assembly?.modules || 0;
-  const blank = Math.max(0, totalSlots - used);
+  const blank = blankSlots(assembly);
   if (blank > 0) {
     addItem(itemMap, {
       sku: "BLANK-COVER",

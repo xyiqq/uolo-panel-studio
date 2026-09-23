@@ -103,3 +103,16 @@ it('relay load neutral belongs to module and breaker inspection without moving t
   view.options={selected:'K1',explodeScope:'all'};view.poseAmount=0;
   expect(view.displayedPorts(edge)[1].loadNeutralReference).toBe(true);
 });
+it('explosion animation hides terminal detail wires instead of rebuilding them every frame',()=>{
+  const view=Object.create(TerminalStudio3D.prototype);
+  const existing={visible:true};
+  let cleared=0;
+  view.clearTerminalWires=()=>{cleared++;};
+  Object.assign(view,{net:{},design:{},model:{wires:new Map()},options:{},terminalWires:existing,explosion:.4,explosionTarget:1});
+  view.drawTerminalWires();
+  expect(existing.visible).toBe(false);expect(cleared).toBe(0);expect(view.dirty).toBe(true);
+  view.explosion=1;view.poseAmount=1;view.selected=null;view.terminalWiresVisible=true;
+  view.terminalPoseKey=JSON.stringify([1,null,undefined,undefined,undefined,undefined,true,[]]);
+  view.drawTerminalWires();
+  expect(existing.visible).toBe(true);expect(cleared).toBe(0);
+});

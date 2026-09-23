@@ -1,3 +1,4 @@
+import "./_require-write.mjs";
 /**
  * 将 V4 UI 原码包装为 ESM 模块。
  */

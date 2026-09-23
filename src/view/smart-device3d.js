@@ -5,6 +5,7 @@
 import { paintModuleFace, moduleFaceSize, faceTextureSize } from "./module-face.js";
 import { networkSwitchPortLayout } from './network-switch-layout.js';
 import { buildPduDevice } from './pdu-device3d.js';
+import { escapeHtml } from '../core/escape.js';
 import { rA, pA, Is, ye, sr, Yt, rr, THREE } from "./three-shim.js";
 
 export const KIND_BODY = {
@@ -52,15 +53,13 @@ export function paintSmartFace(ctx, W, H, product) {
   paintModuleFace(ctx, W, H, product);
 }
 
-function escapeXml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
+const escapeXml = escapeHtml;
 
 /** 文档用横版矢量 SVG（参数化示意，非厂家 CAD；白底打印友好） */
 export function smartFaceSvg(product, width = 360, height = 100) {
   const name = product.name || product.id;
   const brand = product.brand || "";
-  const accent = BRAND_ACCENT[brand] || product.color || "#5a7a8a";
+  const accent = BRAND_ACCENT[brand] || (/^#[\da-f]{6}$/i.test(product.color || "") ? product.color : "#5a7a8a");
   const mods = product.modules != null ? `${product.modules}M` : "—";
   const proto =
     (product.protocol || []).map((p) => String(p).toUpperCase()).join(" · ") ||
@@ -200,9 +199,40 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
   toggle.userData.onY = -h * 0.36;
   toggle.userData.offY = -h * 0.36 - 3;
 
-  for (const p of ports) {
-    kit.cube(s, 5.5, 6.5, 2, p.x, p.y, p.z - 2, "#8a949c", 1);
-    kit.screw(s, p.x, p.y, p.z, 2);
+  if (product.interfaceProfile === 'din-tcp') {
+    // USMART 的 RJ45 与可插拔 RS-485 端子都从设备顶部插拔，
+    // 不应沿用普通模块的前向端子。顶部只保留外壳铭牌和状态控件。
+    const serialCount = Math.max(0, Number(product.serialPorts) || 0);
+    const topY = h / 2 + 2.2;
+    // serialPortLayout matches the face drawing and port sides: 4-port units carry the fourth block underneath.
+    const layout = Array.isArray(product.serialPortLayout) ? product.serialPortLayout : [];
+    const rows = { top: [], bottom: [] };
+    for (let i = 0; i < serialCount; i++) rows[(layout[i] || 'top') === 'top' ? 'top' : 'bottom'].push(i);
+    const terminalW = Math.min(18, Math.max(11, (w - 46) / Math.max(1, rows.top.length)));
+    const serialStart = -w / 2 + 10 + terminalW / 2;
+    for (const [side, indices] of Object.entries(rows)) {
+      const sign = side === 'top' ? 1 : -1, y = sign * topY;
+      indices.forEach((portIndex, i) => {
+        const x = serialStart + i * (terminalW + 3);
+        kit.cube(s, terminalW, 4.2, 12, x, y, 0, '#20a84b', 1.1, 0.18);
+        const holes = portIndex === 0 && serialCount === 4 ? 4 : 3;
+        for (let hole = 0; hole < holes; hole++) {
+          const z = (hole - (holes - 1) / 2) * 2.7;
+          kit.cube(s, 1.8, .7, 1.8, x, y + sign * 2.35, z, '#bbc8b8', .3, .1);
+        }
+      });
+    }
+    const lanX = w / 2 - 13;
+    kit.cube(s, 20, 4.5, 15, lanX, topY + .2, 0, '#a4a7a1', 1.1, 0.2);
+    kit.cube(s, 15.5, 2.5, 10.5, lanX, topY + 2.2, 0, '#182022', .5, 0.12);
+    for (let pin = 0; pin < 8; pin++) {
+      kit.cube(s, .7, .5, 1.8, lanX - 5.2 + pin * 1.5, topY + 3.4, 0, '#c8b36e', .05);
+    }
+  } else {
+    for (const p of ports) {
+      kit.cube(s, 5.5, 6.5, 2, p.x, p.y, p.z - 2, "#8a949c", 1);
+      kit.screw(s, p.x, p.y, p.z, 2);
+    }
   }
 
   if (label) {

@@ -1,4 +1,4 @@
-const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+import {escapeHtml as esc} from '../core/escape.js';
 export function terminalConnectionSvg(rows, {orientation = 'landscape'} = {}) {
   if (orientation === 'portrait') return portraitTerminalConnections(rows);
   const width = 800, height = 100 + Math.ceil(Math.max(1,rows.length)/4)*290;

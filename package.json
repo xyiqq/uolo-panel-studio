@@ -15,14 +15,14 @@
     "docker:down": "docker compose -f docker/docker-compose.yml down"
   },
   "dependencies": {
-    "fflate": "^0.8.3",
-    "lucide": "^0.468.0",
-    "qrcode": "^1.5.4",
-    "three": "^0.170.0"
+    "fflate": "0.8.3",
+    "lucide": "0.468.0",
+    "qrcode": "1.5.4",
+    "three": "0.170.0"
   },
   "devDependencies": {
-    "jsdom": "^25.0.1",
-    "playwright": "^1.49.1",
+    "jsdom": "25.0.1",
+    "playwright": "1.49.1",
     "vite": "5.4.11",
     "vite-plugin-singlefile": "2.0.2",
     "vitest": "2.1.8"

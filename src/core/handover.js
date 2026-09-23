@@ -6,6 +6,7 @@
  */
 
 import { matchCircuit, productSku, findProduct } from "./domain.js";
+import { escapeHtml } from "./escape.js";
 import { handoverReadme } from "./pack.js";
 import { buildChannelRows, channelRowsToCsv } from "./modules.js";
 import {terminalRows, terminalCsv} from './terminal-connections.js';
@@ -131,7 +132,7 @@ export function buildHandoverFiles(ctx = {}) {
 }
 
 function wrapHtml(title, body, size = 'A4', css = '') {
-  const escape = value => String(value || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+  const escape = escapeHtml;
   return (
     `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">` +
     `<title>${escape(title)}</title><style>${String(css).replace(/<\/style/gi, '<\\/style')}</style></head>` +

@@ -184,7 +184,7 @@ export function buildDocumentPack(ctx = {}) {
   const metadata = deliveryMetadata(design);
   for (const page of pages) {
     page.metadata = metadata;
-    if (page.html && page.pageSize !== 'A4-labels') page.html = page.html.replace('</article>', `<footer class="doc-version">${esc(metadata.name)} · ${esc(metadata.revision)} · ${esc(metadata.at)}</footer></article>`);
+    if (page.html && page.pageSize !== 'A4-labels') page.html = page.html.replaceAll('</article>', `<footer class="doc-version">${esc(metadata.name)} · ${esc(metadata.revision)} · ${esc(metadata.at)}</footer></article>`);
     if (page.svg) page.svg = page.svg.replace(/(<svg\b[^>]*>)/, `$1<metadata>${esc(JSON.stringify(metadata))}</metadata>`);
   }
   const mode = uiMode || design?.uiMode || "simple";

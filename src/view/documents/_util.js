@@ -2,13 +2,9 @@
 
 export const DISCLAIMER = "条件性方案 · 非施工合格结论";
 
-export function esc(v) {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+import { escapeHtml as esc } from "../../core/escape.js";
+
+export { esc };
 
 export function dash(v) {
   if (v == null || v === "") return "—";

@@ -166,7 +166,11 @@ export function listUserDesignTemplates() {
 }
 
 function writeUserTemplates(list) {
-  localStorage.setItem(USER_TPL_KEY, JSON.stringify(list.slice(0, 40)));
+  try {
+    localStorage.setItem(USER_TPL_KEY, JSON.stringify(list.slice(0, 40)));
+  } catch (err) {
+    throw new Error(`本机存储空间不足或不可用，模板未保存（${err?.name || err}）；可删除旧模板或先导出方案`);
+  }
 }
 
 /**

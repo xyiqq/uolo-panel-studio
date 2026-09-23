@@ -1,10 +1,11 @@
 /** 装配模块的矢量原稿。SVG 与同步 Canvas 贴图共用图元，不依赖图片加载或网络。 */
 import { networkSwitchPortLayout } from './network-switch-layout.js';
 import {PDU_SOCKET_HOLES,socketHolePolygon} from './pdu-socket-layout.js';
+import { escapeHtml } from '../core/escape.js';
 const FONT = 'Arial,Microsoft YaHei,sans-serif';
 const ACCENTS = { Crestron: '#76b8e4', Lutron: '#ceb67a', MDT: '#75b4db', ABB: '#df5347', 明纬: '#ddbb68', 涂鸦DIN: '#ed9470' };
 const NAMES = { relay: 'RELAY', dimmer: 'DIMMER', gateway: 'INTERFACE', psu: 'POWER', meter: 'METER', contactor: 'ACTUATOR', timer: 'TIMER', terminal: 'TERMINAL', mcb: 'MCB', rcbo: 'RCBO', rccb: 'RCCB', spd: 'SPD' };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+const esc = escapeHtml;
 const safeColor = c => /^#[\da-f]{6}$/i.test(c || '') ? c : '#79968d';
 const finite = (n, fallback) => Number.isFinite(Number(n)) && Number(n) > 0 ? Number(n) : fallback;
 const textWidth = (s, size) => [...String(s)].reduce((n, c) => n + (c.charCodeAt(0) > 255 ? 1 : 0.64) * size, 0);
@@ -32,24 +33,33 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     shapes.push({tag:'text',x,y,fill,'font-size':fitted,'font-weight':600,'text-anchor':anchor,text:t});
   };
   if (p.interfaceProfile === 'din-tcp' && !p.faceRole) {
-    rect(0,0,w,h,'#f1f2ec');rect(2,2,w-4,h-4,'none','#91a89d',5);
-    rect(pad,12,cw,6,'#267a72');
-    text('USMART',pad,48,23,'#24534c',cw*.65);
-    text('DIN-TCP',pad,78,24,'#253d39',cw);
-    text(`1 × LAN / ${p.serialPorts} × RS-485`,pad,102,15,'#536b60',cw);
-    const portW=Math.min(80,cw*.28),portX=w/2-portW/2;
-    rect(portX,122,portW,58,'#29383c','#73847c',3);
-    rect(portX+6,129,portW-12,35,'#0d181c');
-    for(let i=0;i<8;i++)rect(portX+10+i*(portW-20)/8,130,2,17,'#c4aa67');
-    rect(w/2-9,164,18,8,'#0d181c');text('LAN',w/2,200,14,'#31534a',portW,'middle');
-    const cell=cw/p.serialPorts;
-    for(let i=0;i<p.serialPorts;i++){
-      const x=pad+i*cell;rect(x+3,214,cell-6,34,'#4f8570','#345b4c',2);
-      for(let j=0;j<2;j++)circle(x+cell*(j? .7:.3),230,Math.min(5,cell*.1),'#233c32');
-      text(`485-${i+1}`,x+cell/2,270,Math.min(15,cell*.24),'#31534a',cell-4,'middle');
+    rect(0,0,w,h,'#202527');rect(2,2,w-4,h-4,'none','#505b5d',5);
+    rect(pad,12,cw,7,'#3b4446');
+    text('USMART',pad,48,23,'#f0f2ec',cw*.62);
+    text('DIN-TCP',pad,76,20,'#e4e9e4',cw*.7);
+    text(`${p.serialPorts} BUS · DIN-TCP/IP`,pad,100,13,'#a8b3ae',cw);
+    // Upper LAN jack and status area.
+    const lanW=Math.min(94,cw*.32), lanX=w-pad-lanW;
+    rect(lanX,28,lanW,48,'#a4a7a1','#c6cbc4',2);rect(lanX+5,34,lanW-10,29,'#182022');
+    for(let i=0;i<8;i++)rect(lanX+10+i*(lanW-20)/8,36,2,16,'#c8b36e');
+    text('LAN',lanX+lanW/2,93,13,'#d4dbd5',lanW,'middle');
+    // Brand/status markings on the enclosure face.
+    for(const [label,y,color] of [['POWER',143,'#6dc26c'],['RUN',165,'#6d9ccb'],['DATA',187,'#c7ad62']]){
+      rect(pad,y-11,18,8,color,'#111719',1);text(label,pad+27,y,11,'#cbd5ce',cw*.28);
     }
-    text('接口位置示意',w/2,291,10,'#6b7d72',cw,'middle');
-    return {width:W,height:H,w,h,shapes,kind,title:`USMART DIN-TCP · 1 网口 / ${p.serialPorts} RS-485`};
+    circle(w-pad-22,151,7,'#7e8883','#aeb7af');
+    circle(w-pad-22,184,9,'#111719','#050607');text('SETUP',w-pad-22,210,11,'#cbd5ce',58,'middle');
+    // Green pluggable terminals: 4-port versions have three above and one below.
+    const portW=Math.min(86,cw*.24), portH=29, gap=8;
+    const layout=Array.isArray(p.serialPortLayout)?p.serialPortLayout:[];
+    const topIndices=Array.from({length:p.serialPorts},(_,i)=>i).filter(i=>(layout[i]||'top')==='top');
+    const bottomIndices=Array.from({length:p.serialPorts},(_,i)=>i).filter(i=>(layout[i]||'top')!=='top');
+    const topY=222, bottomY=262;
+    const drawPort=(i,x,y)=>{rect(x,y,portW,portH,'#20a84b','#0b572b',2);for(let j=0;j<(i===0&&p.serialPorts===4?4:3);j++)circle(x+12+j*(portW-24)/Math.max(1,(i===0&&p.serialPorts===4?3:2)),y+portH/2,4,'#bdc5b6','#0b572b');text(`485-${i+1}`,x+portW/2,y+portH+13,10,'#d8e4d8',portW,'middle');};
+    topIndices.forEach((portIndex,i)=>drawPort(portIndex,pad+i*(portW+gap),topY));
+    bottomIndices.forEach((portIndex,i)=>drawPort(portIndex,pad+i*(portW+gap),bottomY));
+    text('24V DC',w/2,294,12,'#d3dfd6',cw,'middle');
+    return {width:W,height:H,w,h,shapes,kind,title:`USMART DIN-TCP · 24V DC · 1 网口 / ${p.serialPorts} RS-485`};
   }
   if (p.faceRole === 'terminal-marker') {
     rect(0,0,w,h,'#eef0e4');

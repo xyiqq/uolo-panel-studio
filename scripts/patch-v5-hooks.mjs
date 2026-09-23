@@ -1,3 +1,4 @@
+import "./_require-write.mjs";
 import fs from "fs";
 
 const path = "src/core/domain.js";

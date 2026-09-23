@@ -82,21 +82,16 @@ export function applyLabelRules(design, net) {
   const nodeFace = new Map();
   const wireTags = new Map();
 
-  // 模块前缀计数
+  // 模块前缀计数；端子标签始终用节点 id，面标按模板渲染
   const moduleCounters = { K: 0, D: 0, WH: 0, GW: 0, PS: 0 };
-  for (const node of net?.nodes || net?.assembly?.nodes || []) {
+  const moduleNodes = new Set();
+  for (const node of [...(net?.nodes || []), ...(net?.assembly?.nodes || [])]) {
+    if (moduleNodes.has(node.id)) continue;
     const prefix = modulePrefix(node.product?.kind);
     if (!prefix) continue;
+    moduleNodes.add(node.id);
     moduleCounters[prefix] = (moduleCounters[prefix] || 0) + 1;
-    nodeFace.set(node.id, node.id);
-  }
-  // 装配节点也可能在 assembly.nodes
-  for (const node of net?.assembly?.nodes || []) {
-    if (nodeFace.has(node.id)) continue;
-    const prefix = modulePrefix(node.product?.kind);
-    if (!prefix) continue;
-    moduleCounters[prefix] = (moduleCounters[prefix] || 0) + 1;
-    nodeFace.set(node.id, node.id);
+    nodeFace.set(node.id, tpl(faceTpl, { id: node.id, name: node.label || "", prefix, seq: moduleCounters[prefix] }));
   }
 
   // 按回路顺序收集 N / PE / 出箱端子
@@ -144,8 +139,8 @@ export function applyLabelRules(design, net) {
       portTags.set(p.id, "XPE:0");
       continue;
     }
-    // 器件端子：节点面标.键
-    const face = nodeFace.get(p.node) || p.node;
+    // 器件端子：节点 id.键
+    const face = moduleNodes.has(p.node) ? p.node : nodeFace.get(p.node) || p.node;
     portTags.set(p.id, p.displayTag || `${face}.${p.key}`);
   }
 

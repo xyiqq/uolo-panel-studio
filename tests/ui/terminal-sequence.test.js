@@ -72,3 +72,17 @@ it('allows manual selection, only prompts on the first slice, and clears prompt 
   expect(root.querySelector('[data-sequence-prompt]')).toBeNull();
   expect(root.querySelector('[data-connection="1"] [data-field="output"]').value).toBe('K1:CH3_OUT');
 });
+
+it('keeps unsaved edits when the app re-renders the pane, and drops them after save',()=>{
+  const {root,design,commit}=fixture();
+  const field=(i,key)=>root.querySelector(`[data-connection="${i}"] [data-field="${key}"]`);
+  const args={root,design,resolve:id=>id==='terminal'?{kind:'terminal',poles:4,terminalColor:'gray'}:{kind:'relay',channels:8},commit,download:vi.fn(),terminalId:'T1'};
+  field(1,'loadName').value='草稿灯';field(1,'loadName').dispatchEvent(new Event('change',{bubbles:true}));
+  renderTerminalConnections(args);
+  expect(field(1,'loadName').value).toBe('草稿灯');
+  expect(root.querySelector('.terminal-status').textContent).toBe('有未保存的接线修改');
+  root.querySelector('#terminal-save').click();
+  field(1,'loadName').value='未保存';
+  renderTerminalConnections(args);
+  expect(field(1,'loadName').value).toBe('草稿灯');
+});

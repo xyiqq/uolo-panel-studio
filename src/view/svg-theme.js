@@ -75,26 +75,6 @@ export const LW = {
   bus: 0.7, // 母排
 };
 
-/** A3 横版系统图版面常量（mm） */
-export const LAYOUT = {
-  pageW: 420,
-  pageH: 297,
-  margin: 10,
-  headerH: 15, // 页眉带高度
-  colsPerPage: 16,
-  colW: 20, // 回路列宽
-  colH: 200, // 回路列高
-  colY: 22, // 列顶 y
-  inletW: 60, // 进线区宽
-  busTop: 28, // 母排顶
-  busBot: 230, // 母排底（列底 = colY + colH）
-  colTextX: 1.5, // 列内文字左边距
-  colTextY0: 118, // 参数区首行基线
-  colTextStep: 4.5, // 参数区行距
-  symX: 8, // 列内符号中心 x
-  symY: 14, // 主符号顶 y
-};
-
 /** 省略号截断：超出 max 时保留前 max-1 字并加 …（ slice 视觉升级版） */
 export function ellipsis(v, max) {
   const s = String(v ?? "");

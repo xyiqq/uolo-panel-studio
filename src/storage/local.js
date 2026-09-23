@@ -15,7 +15,11 @@ function readJson(key, fallback = null) {
 }
 
 function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    throw new Error(`本机存储空间不足或不可用，方案未保存（${err?.name || err}）`);
+  }
 }
 
 export function migrateLocalV4IfNeeded() {
@@ -42,7 +46,7 @@ export const localStorageAdapter = {
       id = ids[0];
     }
     if (!id) return readJson(KEY_V4);
-    return readJson(`${KEY_V5}:${id}`) || readJson(KEY_V4);
+    return readJson(`${KEY_V5}:${id}`);
   },
   async save(design) {
     const id = design.designId || crypto.randomUUID();
