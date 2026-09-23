@@ -108,3 +108,11 @@ describe('优诺线槽三维几何', () => {
     }
   });
 });
+
+describe('优诺线槽箱深度', () => {
+  it('默认箱体深 150 mm、线槽深 80 mm，线槽深度不得达到箱体深度', async () => {
+    const {makeDuctCabinet}=await import('../../src/data/cabinets/uolo.js');
+    for(const cab of UOLO_CABINETS){expect(cab.depth).toBe(150);expect(cab.wireDucts.depth).toBe(80);expect(cab.source).not.toContain('待核');}
+    expect(()=>makeDuctCabinet({innerWidth:630,innerHeight:1100,depth:120,ductDepth:120})).toThrow('小于箱体深度');
+  });
+});
