@@ -3,7 +3,7 @@
  * - 内部安装板四周及每两排导轨之间为 40 mm 线槽，线槽之间为安装区，导轨位于安装区正中；
  * - 安装区宽 = 内部宽 − 2×线槽；排数按每排约 176.7 mm（安装区 136.7 + 线槽 40）排满，余量均分到各排；
  * - 外形 = 内部 + 边距，图中左右边距多为 35 mm、上下多为 45 mm。
- * 图纸只有正视尺寸，箱体深度与线槽深度为待核默认值。
+ * 图纸只有正视尺寸：箱体深度 150 mm、线槽深度 80 mm 由用户确认。
  */
 
 export const DUCT_STANDARD = {
@@ -12,7 +12,7 @@ export const DUCT_STANDARD = {
   sideMargin: 35,
   endMargin: 45,
   depth: 150,
-  ductDepth: 60,
+  ductDepth: 80,
   minZoneHeight: 100,
 };
 
@@ -28,6 +28,7 @@ export function makeDuctCabinet(spec) {
   const s = { ...DUCT_STANDARD, mount: "明装", ...spec };
   const { innerWidth: width, innerHeight: height, ductWidth, depth } = s;
   if (![width, height, depth, ductWidth, s.sideMargin, s.endMargin, s.ductDepth].every(Number.isFinite)) throw new Error("线槽箱尺寸需填写数字");
+  if (s.ductDepth <= 0 || s.ductDepth >= depth) throw new Error(`线槽深度 ${s.ductDepth} mm 需大于 0 且小于箱体深度 ${depth} mm`);
   const rows = Number.isInteger(s.rows) && s.rows > 0 ? s.rows : suggestDuctRows(height, s);
   const zoneWidth = width - 2 * ductWidth;
   const zoneHeight = (height - ductWidth * (rows + 1)) / rows;
@@ -55,7 +56,7 @@ export function makeDuctCabinet(spec) {
     maxDeviceDepth: depth - 25,
     zonesDefault: Array.from({ length: rows }, (_, i) => (i === rows - 1 && rows > 1 ? "control" : "power")),
     wireDucts: { width: ductWidth, depth: s.ductDepth, zoneWidth, zoneHeight },
-    source: `优诺线槽箱标准：内部 ${width}×${height} mm、外形 ${outer[0]}×${outer[1]} mm、线槽 ${ductWidth} mm；深度 ${depth} mm、线槽深 ${s.ductDepth} mm 待核`,
+    source: `优诺线槽箱标准：内部 ${width}×${height} mm、外形 ${outer[0]}×${outer[1]} mm、线槽 ${ductWidth} mm；深度 ${depth} mm、线槽深 ${s.ductDepth} mm`,
     estimated: false,
     priceReference: null,
   };

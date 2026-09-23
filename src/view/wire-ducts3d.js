@@ -2,6 +2,7 @@
  * 线槽几何：左右竖槽贯通内部全高，顶、底及每两排导轨之间为横槽。
  * 线槽不加盖板，柜内导线在三维视图中保持可见。
  */
+import { DUCT_STANDARD } from "../data/cabinets/uolo.js";
 
 const BODY = "#8f989c";
 const WALL = "#b3bbbe";
@@ -46,7 +47,7 @@ function renderRect(r, box) {
 
 /** @param {Function} cube Studio kit cube(group,w,h,d,x,y,z,color,radius,metalness) */
 export function addWireDucts(cube, group, box) {
-  const depth = box?.wireDucts?.depth || 60, wall = 3, z0 = PLATE_FRONT + 0.2;
+  const depth = box?.wireDucts?.depth || DUCT_STANDARD.ductDepth, wall = 3, z0 = PLATE_FRONT + 0.2;
   for (const r of wireDuctRects(box).map((rect) => renderRect(rect, box))) {
     cube(group, r.w, r.h, wall, r.x, r.y, z0 + wall / 2, BODY, 0.6, 0.2);
     const [dx, dy] = r.vertical ? [(r.w - wall) / 2, 0] : [0, (r.h - wall) / 2];
