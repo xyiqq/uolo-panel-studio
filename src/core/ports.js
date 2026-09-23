@@ -80,6 +80,16 @@ export function buildPortTemplates(product) {
       add("DC+", "DC+", "top", "in");
       add("DC-", "DC-", "top", "in");
     }
+    // USMART DIN-TCP exposes independent A/B pairs for each RS-485 port.
+    // LAN is an RJ45 data socket and intentionally is not an electrical wire port.
+    if (product.interfaceProfile === 'din-tcp' && Number.isInteger(product.serialPorts)) {
+      for (let i = 1; i <= product.serialPorts; i++) {
+        const side = (product.serialPortLayout?.[i - 1] || 'top') === 'top' ? 'top' : 'bottom';
+        add(`RS485_${i}_A`, 'RS485-A', side, 'both', i);
+        add(`RS485_${i}_B`, 'RS485-B', side, 'both', i);
+      }
+      return ports;
+    }
     if (product.powerInput === "LN") {
       add("L_IN", "L", "top", "in");
       add("N_IN", "N", "top", "in");

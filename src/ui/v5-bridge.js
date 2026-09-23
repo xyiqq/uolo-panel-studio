@@ -29,6 +29,7 @@ import "../styles/documents.css";
 import documentCss from "../styles/documents.css?raw";
 import {projectQrUrl} from '../view/qr.js';
 import {paginateDocumentPages} from '../view/documents/paginate.js';
+import {escapeHtml} from '../core/escape.js';
 
 const DISCLAIMER = "条件性方案 · 非施工合格结论";
 
@@ -36,11 +37,7 @@ function $(sel, root = document) {
   return root.querySelector(sel);
 }
 
-function esc(v) {
-  return String(v ?? "").replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
-  );
-}
+const esc = escapeHtml;
 
 function downloadBlob(blob, name) {
   const a = document.createElement("a");
@@ -193,9 +190,13 @@ function injectTabs() {
   }
 }
 
+let refreshSpacePanel = null;
+
 function injectSpacePanel(api) {
   const left = $(".left .side-section") || $(".left");
-  if (!left || $("#v5-space")) return;
+  if (!left) return;
+  // mountV5Bridge runs on every app render, which keeps the panel in step with edits.
+  if ($("#v5-space")) { refreshSpacePanel?.(api); return; }
   const box = document.createElement("div");
   box.className = "v5-space";
   box.id = "v5-space";
@@ -214,7 +215,8 @@ function injectSpacePanel(api) {
   const capacity = $("#capacity")?.closest(".side-section") || left;
   capacity.appendChild(box);
 
-  const refresh = () => {
+  const refresh = (current = api) => {
+    api = current;
     try {
       const design = api.getDesign();
       const assembly = api.getAssembly();
@@ -261,10 +263,8 @@ function injectSpacePanel(api) {
     api.persist?.();
     refresh();
   });
-  // periodic light refresh
-  setInterval(refresh, 1500);
+  refreshSpacePanel = refresh;
   refresh();
-  api._refreshSpace = refresh;
 }
 
 function exposeSmartProducts() {
@@ -376,7 +376,7 @@ function collectPack(api, { interactive = false } = {}) {
 
 function selectedPages(pack) {
   const pages = docState.selected ? pack.pages.filter((p) => docState.selected.has(p.id)) : pack.pages;
-  return pages.map((page,index)=>({...page,html:page.html?.replace(/第 \d+ \/ \d+ 页/g,`第 ${index+1} / ${pages.length} 页`)}));
+  return pages.map((page,index)=>({...page,html:page.html?.replace(/(<span class="doc-page-number">)第 \d+ \/ \d+ 页(<\/span>)/g,`$1第 ${index+1} / ${pages.length} 页$2`)}));
 }
 
 function renderDocs(api) {

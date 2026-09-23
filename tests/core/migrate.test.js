@@ -21,7 +21,7 @@ describe("migrate V2 → V3", () => {
     expect(v3.spareRatio).toBe(0.25);
     expect(v3.publicBaseUrl).toBeNull();
     expect(v3.signoff).toEqual({});
-    expect(v3.labelRules.circuitTemplate).toBe("{id}");
+    expect(v3.labelRules).toMatchObject({ circuitLabel: "{id} {name}", faceLabel: "{id}", wireTag: "{circuit}-{conductor}" });
     expect(v3.circuits.length).toBe(v2.circuits.length);
     for (const c of v3.circuits) {
       expect(Array.isArray(c.devices)).toBe(true);
@@ -30,6 +30,11 @@ describe("migrate V2 → V3", () => {
       expect(c.rcdProductId).toBeUndefined();
     }
     expect(() => validateDesignV3(v3)).not.toThrow();
+  });
+
+  it("迁移保留 V2 已有的标签模板", () => {
+    const v2 = { ...createDefaultDesign(), labelRules: { circuitLabel: "{id}-{name}", qrMode: "online" } };
+    expect(migrateV2ToV3(v2).labelRules).toMatchObject({ circuitLabel: "{id}-{name}", faceLabel: "{id}", qrMode: "online" });
   });
 
   it("loadDesign 识别 v2 并迁移", () => {

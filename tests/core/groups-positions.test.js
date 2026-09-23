@@ -28,6 +28,8 @@ describe("自定义逻辑分区", () => {
     expect(() => validateCustomGroup({ id: "heat", name: "地暖" })).toThrow();
     expect(() => validateCustomGroup({ id: "USR-GRP-x", name: "" })).toThrow();
     expect(() => validateCustomGroup({ id: "USR-GRP-x", name: "名".repeat(21) })).toThrow();
+    expect(validateCustomGroup({ id: "USR-GRP-x", name: "x", icon: 'x" onmouseover="alert(1)' }).icon).toBe("shapes");
+    expect(validateCustomGroup({ id: "USR-GRP-x", name: "x", icon: "air-vent" }).icon).toBe("air-vent");
     expect(() => validateCustomGroup({ id: "USR-GRP-x", name: " 地暖 " }).name).not.toThrow;
     expect(validateCustomGroup({ id: "USR-GRP-x", name: " 地暖 " }).name).toBe("地暖");
   });

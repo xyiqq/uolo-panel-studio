@@ -19,6 +19,7 @@ import {
   psu,
 } from "./symbols.js";
 import { productSku } from "../core/domain.js";
+import { escapeHtml } from "../core/escape.js";
 import { computeBusBudgets } from "../core/buses.js";
 import { circuitModuleChannels, moduleDeliveryLinks } from "./module-delivery-links.js";
 import {
@@ -34,13 +35,7 @@ const PAGE_H = 270;
 const BODY_SIZE = 3.5;
 const LINE_HEIGHT = 4.8;
 
-function esc(v) {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+const esc = escapeHtml;
 
 function textOrDash(v) {
   if (v == null || v === "") return "—";

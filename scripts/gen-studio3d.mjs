@@ -1,3 +1,4 @@
+import "./_require-write.mjs";
 import fs from "fs";
 
 const chunk = fs.readFileSync(process.env.TEMP + "/studio-app.js", "utf8");

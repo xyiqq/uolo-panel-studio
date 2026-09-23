@@ -22,4 +22,14 @@ describe("labels · 编号规则", () => {
       expect(String(w.toTag)).not.toMatch(/undefined/);
     }
   });
+
+  it("面标模板对模块生效，端子标签仍用模块编号", () => {
+    const node = { id: "K1", label: "客厅灯控", product: { kind: "relay" } };
+    const smartNet = { nodes: [node], ports: { "K1:CH1_OUT": { id: "K1:CH1_OUT", node: "K1", key: "CH1_OUT" } }, wires: [] };
+    const plain = applyLabelRules({ circuits: [] }, smartNet);
+    expect(plain.faceLabel(node)).toBe("K1");
+    const custom = applyLabelRules({ circuits: [], labelRules: { faceLabel: "{prefix}-{seq} {name}" } }, smartNet);
+    expect(custom.faceLabel(node)).toBe("K-1 客厅灯控");
+    expect(custom.terminalTag("K1:CH1_OUT")).toBe("K1.CH1_OUT");
+  });
 });

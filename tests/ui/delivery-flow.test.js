@@ -39,9 +39,10 @@ it('ZIP 等待离线HTML时活动方案的修改不混入已收集的交付快�
 });
 afterEach(()=>{vi.clearAllTimers();vi.useRealTimers();vi.restoreAllMocks();});
 
-it('保留方案备用比例，定时刷新不覆盖保存的数据',()=>{
+it('保留方案备用比例，应用重绘刷新空间面板但不覆盖保存的数据',async()=>{
   expect($('#v5-spare').value).toBe('40');
-  design.spareRatio=.1;vi.advanceTimersByTime(1500);
+  design.spareRatio=.1;
+  const {mountV5Bridge}=await import('../../src/ui/v5-bridge.js');mountV5Bridge(api);
   expect(design.spareRatio).toBe(.1);expect($('#v5-spare').value).toBe('10');
   $('#v5-spare').value='30';$('#v5-spare').dispatchEvent(new Event('input'));
   expect(design.spareRatio).toBe(.3);expect(api.persist).toHaveBeenCalled();

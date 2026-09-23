@@ -6,6 +6,9 @@ import {terminalWireGeometry, terminalPanelWirePoints, routeCabinetWire, Orthogo
 import {terminalLabelLayout} from './terminal-label-layout.js';
 import {nodeExplosionOffset, connectionInspection, wireTouchesSelection} from './exploded-wiring.js';
 
+// Product fields read by smart-device3d / module-face beyond those in Studio3D.signature.
+const VISUAL_FIELDS=['sku','kind','modules','poles','curve','channels','marker','faceRole','protocol','interfaceProfile','serialPorts','serialPortLayout','networkProfile','networkPorts','networkPortRows','networkPortNames','networkLabelColumns','networkDeviceLabel','networkPhysicalHeight','networkPhysicalDepth','outletCount','outletNumber','outletText','terminalColor','psuOutput'];
+
 export class TerminalStudio3D extends Studio3D {
   /** Full cabinet export, independent of viewport size, selection and exploded inspection. */
   screenshot() { return this.captureDocumentImage({mimeType:'image/png'}); }
@@ -35,7 +38,7 @@ export class TerminalStudio3D extends Studio3D {
     }
   }
   signature(net) {
-    return super.signature(net) + JSON.stringify([net.nodes.filter(n=>n.id==='N').map(n=>[n.x,n.y,n.barOrient]),net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || ''])]);
+    return super.signature(net) + JSON.stringify([net.nodes.filter(n=>n.id==='N').map(n=>[n.x,n.y,n.barOrient]),net.assembly.nodes.map(n=>[n.id,n.product.hardwareId || '',n.product.ipAddress || '',n.product.displayName || '',VISUAL_FIELDS.map(k=>n.product[k] ?? null)])]);
   }
   build(net, design, runtime, options) {
     this.terminalPoseKey=null;
@@ -139,14 +142,31 @@ export class TerminalStudio3D extends Studio3D {
       const label=new THREE.Mesh(new THREE.PlaneGeometry(width,height),new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide,depthTest:false,depthWrite:false,transparent:true}));
       label.renderOrder=20;label.userData.fieldLabel=true;label.userData.text=text;
       this.wireLabels.set(key,label);
+      this.evictWireLabels();
     }
-    return this.wireLabels.get(key);
+    const label=this.wireLabels.get(key);
+    this.wireLabels.delete(key);this.wireLabels.set(key,label);
+    return label;
+  }
+  evictWireLabels(limit=200) {
+    for(const [key,label] of this.wireLabels) {
+      if(this.wireLabels.size<=limit) break;
+      if(label.parent) continue;
+      label.geometry.dispose();label.material.map.dispose();label.material.dispose();
+      this.wireLabels.delete(key);
+    }
   }
   drawTerminalWires() {
     const {net,design,options}=this;
     if(!net||!design||!this.model) return;
+    // Rebuilding every tube and label per animation frame stalls explosion; redraw once the pose settles.
+    if(this.explosion!==this.explosionTarget) {
+      if(this.terminalWires) this.terminalWires.visible=false;
+      this.dirty=true;
+      return;
+    }
     const poseKey=JSON.stringify([this.poseAmount,this.selected,options.explodeScope,options.exploded,options.isolate,options.wireMode,this.terminalWiresVisible,[...this.model.wires.values()].filter(r=>r.mesh.visible).map(r=>r.edge.id)]);
-    if(this.terminalPoseKey===poseKey&&this.terminalWires) return;
+    if(this.terminalPoseKey===poseKey&&this.terminalWires) {this.terminalWires.visible=true;return;}
     this.terminalPoseKey=poseKey;
     this.clearTerminalWires();
     const group=new THREE.Group();group.name='connection-details';
@@ -185,7 +205,7 @@ export class TerminalStudio3D extends Studio3D {
     if(options.wireMode!=='none') for(const ref of this.model.wires.values()) {
       if(!ref.mesh.visible||!ref.edge.moduleNeutral) continue;
       const [,port]=this.displayedPorts(ref.edge);
-      const marker=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),ref.mesh.material);
+      const marker=new THREE.Mesh(this.markerGeometry(),ref.mesh.material);
       marker.position.set(port.x,port.y,port.z+this.offset(port.node));group.add(marker);
       const label=this.label(`${ref.edge.moduleId} 负载零线（直达负载）`,140,10,'#28546a');
       label.position.copy(marker.position).add(new THREE.Vector3(-70,-13,4));group.add(label);
@@ -198,7 +218,7 @@ export class TerminalStudio3D extends Studio3D {
           const port=this.displayedPorts(w)[id===w.from?0:1];
           if(this.model.parts.has(port.node)||shownPorts.has(id)) continue;
           shownPorts.add(id);
-          const marker=new THREE.Mesh(new THREE.SphereGeometry(3,8,6),ref.mesh.material);
+          const marker=new THREE.Mesh(this.markerGeometry(),ref.mesh.material);
           marker.position.set(port.x,port.y,port.z+(port.supplyReference?0:this.offset(port.node)));group.add(marker);
           const label=this.label(`${id} ${port.supplyReference?'零线排引入':'接线点'}`,75,9,'#28546a');
           label.position.copy(marker.position).add(new THREE.Vector3(0,10,4));group.add(label);
@@ -224,10 +244,13 @@ export class TerminalStudio3D extends Studio3D {
     if(target) this.applyPose(previous);
     return bounds;
   }
+  markerGeometry() {
+    return this.sharedMarkerGeometry ||= new THREE.SphereGeometry(3,8,6);
+  }
   clearTerminalWires(labels=false) {
     if(this.terminalWires) {
       for(const child of [...this.terminalWires.children]) {
-        if(child.userData.fieldLabel) child.removeFromParent();else child.geometry?.dispose();
+        if(child.userData.fieldLabel) child.removeFromParent();else if(child.geometry!==this.sharedMarkerGeometry) child.geometry?.dispose();
       }
       this.scene.remove(this.terminalWires);this.terminalWires=null;
     }
@@ -240,5 +263,5 @@ export class TerminalStudio3D extends Studio3D {
     for(const ref of this.model?.wires.values()||[]) if(ref.dynamicGeometry) {ref.mesh.geometry.dispose();ref.stripe?.geometry.dispose();}
     super.releaseModel();
   }
-  dispose() {this.clearTerminalWires(true);this.terminalMaterial?.dispose();super.dispose();}
+  dispose() {this.clearTerminalWires(true);this.terminalMaterial?.dispose();this.sharedMarkerGeometry?.dispose();super.dispose();}
 }

@@ -11,9 +11,9 @@ function uuid() {
 }
 
 const DEFAULT_LABEL_RULES = {
-  circuitTemplate: "{id}",
-  faceTemplate: "{id} {name} {in}A",
-  wireTemplate: "{circuit}-{conductor}",
+  circuitLabel: "{id} {name}",
+  faceLabel: "{id}",
+  wireTag: "{circuit}-{conductor}",
   terminalPrefix: { N: "XN", PE: "XPE", load: "X" },
   qrMode: "offline",
 };
@@ -22,12 +22,7 @@ export function migrateV2ToV3(v2raw) {
   const v2 = validateDesignV2(structuredClone(v2raw));
   const now = new Date().toISOString();
   const circuits = (v2.circuits || []).map((c) => {
-    const devices = [];
-    if (c.productId != null || c.productId === null) {
-      devices.push({ role: "protection", productId: c.productId ?? null });
-    } else {
-      devices.push({ role: "protection", productId: null });
-    }
+    const devices = [{ role: "protection", productId: c.productId ?? null }];
     if (c.rcdProductId) devices.push({ role: "rcd", productId: c.rcdProductId });
     const { productId, rcdProductId, ...rest } = c;
     return { ...rest, devices };
@@ -47,7 +42,7 @@ export function migrateV2ToV3(v2raw) {
     buses: structuredClone(v2.buses || []),
     customCabinets: structuredClone(v2.customCabinets || []),
     spareRatio: 0.25,
-    labelRules: DEFAULT_LABEL_RULES,
+    labelRules: { ...DEFAULT_LABEL_RULES, ...(v2.labelRules || {}) },
     circuits,
   };
   return validateDesignV3(v3);

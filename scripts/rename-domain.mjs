@@ -1,3 +1,4 @@
+import "./_require-write.mjs";
 /**
  * P0-3：把 _legacy-domain.js 中的压缩标识符改成语义名。
  */

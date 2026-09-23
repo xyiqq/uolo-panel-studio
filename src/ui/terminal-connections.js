@@ -2,12 +2,20 @@ import {terminalRows, outputOptions, saveTerminalRows, terminalCsv, sequentialTe
 import {terminalConnectionSvg, esc} from '../view/terminal-connections.js';
 import '../styles/terminal-connections.css';
 
+// The app re-renders this pane after unrelated edits; carry unsaved field values across by terminal pole.
+function unsavedDraft(root) {
+  if (root.dataset.terminalDirty !== '1' || !root.querySelector('.terminal-editor')) return null;
+  return new Map([...root.querySelectorAll('[data-connection]')].map(tr=>[tr.dataset.key,Object.fromEntries([...tr.querySelectorAll('[data-field]')].map(el=>[el.dataset.field,el.value]))]));
+}
+
 export function renderTerminalConnections({root, design, resolve, commit, download, terminalId=null, onSaved}) {
+  const draft = unsavedDraft(root);
+  delete root.dataset.terminalDirty;
   const rows = terminalRows(design,resolve), outputs = outputOptions(design,resolve);
   const options = (items,current) => items.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(current)?'selected':''}>${esc(t)}</option>`).join('');
   root.innerHTML = `<section class="terminal-editor"><div class="pane-head"><h2>端子连接</h2><div class="tools"><button class="btn" id="terminal-svg">下载 SVG</button><button class="btn" id="terminal-csv">接线 CSV</button><button class="btn primary" id="terminal-save">保存接线</button></div></div>
     <p class="terminal-status" role="status"></p>
-    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>端子节号</th><th>上端设备</th><th>类型</th><th>下端输出通道</th><th>线号</th><th>线径 mm²</th></tr></thead><tbody>${rows.map((r,i)=>`<tr data-connection="${i}"><td>${esc(r.terminalId)}:${r.pole}</td>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>端子节号</th><th>上端设备</th><th>类型</th><th>下端输出通道</th><th>线号</th><th>线径 mm²</th></tr></thead><tbody>${rows.map((r,i)=>`<tr data-connection="${i}" data-key="${esc(r.terminalId)}:${r.pole}"><td>${esc(r.terminalId)}:${r.pole}</td>
       <td><input aria-label="${esc(r.terminalId)}:${r.pole} 上端设备" data-field="loadName" maxlength="80" value="${esc(r.loadName)}"></td>
       <td><select data-field="loadType" aria-label="设备类型">${options([['light','灯具'],['motor','电机'],['other','其他']],r.loadType)}</select></td>
       <td><select data-field="output" aria-label="${esc(r.terminalId)}:${r.pole} 下端通道" ${r.color==='blue'?'disabled':''}>${options([['','未连接'],...outputs.map(o=>[o.value,o.label])],r.output)}</select></td>
@@ -22,6 +30,7 @@ export function renderTerminalConnections({root, design, resolve, commit, downlo
     root.querySelector('.terminal-preview').innerHTML=terminalConnectionSvg(read().filter(r=>!terminalId||r.terminalId===terminalId));
     status.classList.remove('error');
     status.textContent='有未保存的接线修改';
+    root.dataset.terminalDirty='1';
   };
   const refreshOptions = () => {
     const draft=read();
@@ -79,12 +88,20 @@ export function renderTerminalConnections({root, design, resolve, commit, downlo
       prompt.remove();refreshPreview();
     };
   };
+  let restored = false;
+  if (draft) root.querySelectorAll('[data-connection]').forEach(tr=>{
+    const saved=draft.get(tr.dataset.key);
+    if(!saved) return;
+    tr.querySelectorAll('[data-field]').forEach(el=>{if(el.dataset.field in saved&&el.value!==saved[el.dataset.field]){el.value=saved[el.dataset.field];restored=true;}});
+  });
   refreshOptions();
+  if (restored) refreshPreview();
   root.querySelector('#terminal-save').disabled = !rows.length;
   root.querySelector('#terminal-save').onclick = () => {
     try {
       const next = read();
       saveTerminalRows(structuredClone(design),next,resolve);
+      delete root.dataset.terminalDirty;
       commit(d=>saveTerminalRows(d,next,resolve),true);
       sequenceTerminal=null;
       root.querySelector('[data-sequence-prompt]')?.remove();

@@ -88,11 +88,10 @@ export function validateHardwareId(design, moduleId, value) {
 export function nextModuleId(design, kind) {
   const prefix = moduleIdPrefix(kind);
   const used = new Set((design?.modules || []).map((m) => m.id));
-  for (let i = 1; i < 1000; i++) {
+  for (let i = 1; ; i++) {
     const id = `${prefix}${i}`;
     if (!used.has(id)) return id;
   }
-  return `${prefix}${Date.now()}`;
 }
 
 /**
@@ -198,8 +197,8 @@ export function normalizeModules(design, findProduct) {
     try {
       const product = findProduct ? findProduct(raw.productId) : null;
       out.push(normalizeModule(raw, product));
-    } catch {
-      /* 丢弃非法条目 */
+    } catch (err) {
+      console.warn(`已丢弃非法模块 ${raw?.id ?? "(无 id)"}：${err?.message || err}`);
     }
   }
   design.modules = out;
@@ -411,7 +410,7 @@ export function suggestSmartFeedCircuit(design) {
     path: "智能控制 / 模块取电",
     loadIds: [],
     voltage: 220,
-    phase: design.supply === "single" ? "L1" : "L1",
+    phase: "L1",
     pf: 0.8,
     method: "B2",
     ambient: 30,
@@ -464,20 +463,18 @@ export function nextBusId(design, type) {
   const prefix = `B-${(type || "BUS").toUpperCase()}`;
   const used = new Set((design.buses || []).map((b) => b.id));
   if (!used.has(prefix)) return prefix;
-  for (let i = 2; i < 100; i++) {
+  for (let i = 2; ; i++) {
     const id = `${prefix}-${i}`;
     if (!used.has(id)) return id;
   }
-  return `${prefix}-${Date.now()}`;
 }
 
 function nextProtectGroupId(design) {
   const used = new Set((design.protectGroups || []).map((g) => g.id));
-  for (let i = 1; i < 1000; i++) {
+  for (let i = 1; ; i++) {
     const id = `PG${i}`;
     if (!used.has(id)) return id;
   }
-  return `PG${Date.now()}`;
 }
 
 /**

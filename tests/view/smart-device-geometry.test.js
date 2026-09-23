@@ -72,3 +72,21 @@ describe("smart module physical shell contact", () => {
     expect(right.frontMin - left.frontMax).toBeCloseTo(0, 5);
   });
 });
+
+describe("USMART DIN-TCP serial terminals", () => {
+  it.each([[4, 3, 1], [2, 1, 1]])("%s-port unit follows serialPortLayout: %s on top, %s underneath", async (count, top, bottom) => {
+    const { USMART_PRODUCTS } = await import("../../src/data/products/smart-usmart.js");
+    const product = USMART_PRODUCTS.find((p) => p.serialPorts === count);
+    const kit = geometryKit(), terminals = [];
+    const cube = kit.cube;
+    kit.cube = (group, width, height, depth, x, y, z, color, ...rest) => {
+      if (color === "#20a84b") terminals.push(y);
+      return cube(group, width, height, depth, x, y, z, color, ...rest);
+    };
+    const { group } = buildSmartDevice(kit, product);
+    expect(terminals.filter((y) => y > 0)).toHaveLength(top);
+    expect(terminals.filter((y) => y < 0)).toHaveLength(bottom);
+    expect(terminals.every((y) => Math.abs(y) > product.height / 2)).toBe(true);
+    group.traverse((mesh) => { mesh.geometry?.dispose(); mesh.material?.dispose(); });
+  });
+});

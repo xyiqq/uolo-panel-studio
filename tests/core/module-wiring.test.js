@@ -97,7 +97,7 @@ describe('explicit module wiring',()=>{
     d.customProducts[0].powerInput='112vdc';
     expect(buildWiring(d).wires.filter(w=>w.class==='dc')).toHaveLength(0);
   });
-  it('connects DLP-04R to DALI modules and keeps unknown DC inputs pending',()=>{
+  it('connects DLP-04R to DALI modules and the declared 24V USMART input',()=>{
     const d=fixture();
     d.customProducts.push({id:'USR-DALI',kind:'gateway',name:'External-powered DALI device',width:36,height:86,depth:60,modules:2,powerInput:'bus',protocol:['dali']});
     d.modules=[normalizeModule({id:'PS1',productId:'meanwell-dlp-04r'}),normalizeModule({id:'DA1',productId:'USR-DALI'}),normalizeModule({id:'GW1',productId:'usmart-din-tcp-2rs485'})];
@@ -108,8 +108,9 @@ describe('explicit module wiring',()=>{
     d.modules[0].productId='meanwell-hdr-100-24n';
     d.buses=[{id:'DC',type:'dc',voltage:24,psuModuleIds:['PS1'],deviceModuleIds:['GW1']}];
     n=buildWiring(d);
-    expect(n.wires.filter(w=>w.class==='dc')).toHaveLength(0);
-    expect(n.wiringIssues.some(i=>i.code==='BUS_DEVICE_UNVERIFIED'&&i.moduleId==='GW1')).toBe(true);
+    expect(n.wires.filter(w=>w.class==='dc')).toHaveLength(2);
+    expect(n.wires.find(w=>w.to==='GW1:DC+')).toMatchObject({from:'PS1:DC+',scope:'24V 模块控制供电'});
+    expect(n.wiringIssues.some(i=>i.code==='BUS_DEVICE_UNVERIFIED'&&i.moduleId==='GW1')).toBe(false);
   });
   it.each(['internal-only','switchable'])('does not parallel DLP-04R with a %s internal DALI supply',daliPowerSupply=>{
     const d=fixture();
