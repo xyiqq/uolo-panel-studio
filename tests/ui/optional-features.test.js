@@ -22,6 +22,15 @@ function fixture(overrides={}) {
 }
 
 describe('可选工具 DOM 验收',()=>{
+  it('保留控制总线的 mA 预算并列出 DIN-DALI-2 拨档对应的整机瓦数',()=>{
+    const f=fixture({modules:[{id:'GW',productId:'crestron-din-dali-2',daliPowerMode:'EXT'}],
+      buses:[{id:'CTRL',type:'dc',label:'控制侧',voltage:24,budgetUnit:'mA',capacity:1000,deviceModuleIds:['GW']}]});
+    click('[data-feature="busEditor"]');
+    expect(query('.feature-bus-list').textContent).toContain('83.33 / 1000 mA');
+    expect(query('.feature-bus-list').textContent).toContain('GW · EXT · 2 W');
+    expect(f.design.buses[0].budgetUnit).toBe('mA');
+  });
+
   it('三个入口独立开关，保存重载后隐藏不删除总线或分排配置',()=>{
     const f=fixture({rowZones:['power','control'],buses:[{id:'DC1',type:'dc',label:'保留配置'}]});
     click('[data-feature-settings]');
@@ -58,6 +67,31 @@ describe('可选工具 DOM 验收',()=>{
     change('#bus-capacity','24');change('#bus-unit','mA');expect(query('#bus-capacity').value).toBe('');
     change('#bus-capacity','250');change('#bus-type','knx');expect(query('#bus-capacity').value).toBe('');expect(query('#bus-voltage').value).toBe('30');
     click('[data-bus-save]');expect(f.design.buses[0]).toMatchObject({type:'knx',budgetUnit:'mA',capacity:null,voltage:30});
+  });
+
+  it('Cresnet 串接保存电源、长度和成员顺序，切换直连时移除串接字段',()=>{
+    const f=fixture({modules:[
+      {id:'GW1',productId:'crestron-din-ap4'},{id:'PS1',productId:'crestron-din-pws50'},
+      {id:'PS2',productId:'meanwell-hdr-30'},{id:'D1',productId:'crestron-din-4dimu4-6513187'},
+      {id:'D2',productId:'crestron-din-4dimu4-6513187'},
+    ]});
+    click('[data-feature="busEditor"]');click('[data-bus-new]');change('#bus-type','cresnet');
+    change('#bus-label','标准 Cresnet');change('#bus-controller','GW1');
+    expect(query('#bus-chain-supply option[value="PS2"]')).toBeNull();
+    change('#bus-chain-supply','PS1');change('#bus-length','15');change('#bus-chain-length','12');
+    change('[data-bus-member="D1"]',true);change('[data-bus-member="D2"]',true);
+    click('[data-bus-move-up="D2"]');click('[data-bus-save]');
+    const [bus]=f.design.buses;
+    expect(bus).toMatchObject({controllerModuleId:'GW1',chainSupplyModuleId:'PS1',chainPowerMeters:12,cableMeters:15,deviceModuleIds:['D2','D1']});
+    expect(query('.feature-bus-list article p').textContent).toContain('/ 50 W');
+    f.reload();click('[data-feature="busEditor"]');click(`[data-bus-edit="${bus.id}"]`);
+    expect(query('#bus-chain-supply').value).toBe('PS1');
+    expect(query('[data-bus-member="D1"]').parentElement.textContent).toContain('D2 NET2 → NET');
+    change('#bus-chain-supply','');click('[data-bus-save]');
+    expect(f.design.buses[0]).not.toHaveProperty('chainSupplyModuleId');
+    expect(f.design.buses[0]).not.toHaveProperty('chainPowerMeters');
+    expect(f.design.buses[0].deviceModuleIds).toEqual(['D2','D1']);
+    expect(query('.feature-bus-list article p').textContent).toContain('数据 Y/Z/G');
   });
 
   it('电气校核将总线错误定位至编辑表单，将器件错误定位至检查器',()=>{

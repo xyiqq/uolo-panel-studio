@@ -1,6 +1,19 @@
+import {customElectricalFields,readCustomElectrical} from './custom-product-electrical.js';
 import {createStandaloneHtml} from './standalone-html.js';
 import {readSitePhoto} from './site-photo.js';
 import {psuConnectionFields,modulePowerDescription} from './psu-connections.js';
+import {bindDaliPowerFields,daliPowerFields} from './dali-power-settings.js';
+import {qsFields, bindQsFields} from './qs-link.js';
+import {serialFields,readSerialFields} from './serial-rs485.js';
+import {rs485CableNote} from '../core/serial-rs485.js';
+import {ensureLoadTerminalFree} from '../core/field-terminals.js';
+import {validateQsConfig,qsReceiver,qsMainsIssue,qsBusIssue,qsHardware} from '../core/qs-link.js';
+import {loadTopology,hasDryContacts} from '../core/crestron-loads.js';
+import {verifiedLoadFields,readVerifiedLoadFields,verifyLoadCircuitSelection,bindAnalogCurrent} from './crestron-loads.js';
+import {daliFieldInputs,bindDaliFieldInputs} from './abb-dali.js';
+import {abbDaliLines,validateDaliFields,daliFieldLineCount,fieldLineLabel,daliFieldCapacity,fieldBudgetLabel} from '../core/abb-dali.js';
+import {isDinDali2,daliPowerMode,saveDaliPower} from '../core/dali-power.js';
+import {daliSettingsSummary} from '../view/dali-power.js';
 import {psuConnectionType,savePsuConnections} from '../core/psu-connections.js';
 import {resolveDesignLink} from '../core/design-link.js';
 import { createIcons, icons } from "lucide";
@@ -24,6 +37,10 @@ import { mountV5Bridge } from "./v5-bridge.js";
 import { renderTerminalConnections } from './terminal-connections.js';
 import { readInstallPosition, rememberInstallPosition } from './install-position.js';
 import {resolveModuleFeedBindings,isMainsFedModule} from '../core/module-feeds.js';
+import {hasIndependentLoadFeeds,isCresnetReceiver,isCresnetController,isCresnetChainSupply} from '../core/ports.js';
+import {isCresnetDataBus,isCresnetChainBus} from '../core/cresnet.js';
+import {DIMMER_BRIDGE_MODES,dimmerBridgeLabel,dimmerGroupUsesIncludedJumpers,dimmerOutputGroups} from '../core/dimmer-bridging.js';
+import {terminalRows} from '../core/terminal-connections.js';
 import {buildDeliveryNet} from '../core/delivery-net.js';
 import {wireRows as deliveryWireRows} from '../core/handover.js';
 import {applyLabelRules as deliveryLabels} from '../core/labels.js';
@@ -211,7 +228,10 @@ function moduleAddressFields(m){
     (['ip','both'].includes(mode)?Bt('IP 地址',`<input id="insp-ip-address" data-module-ip="${it(m.id)}" value="${it(m.ipAddress||'')}" maxlength="45" placeholder="192.168.1.100" aria-describedby="module-ip-error">`)+'<p id="module-ip-error" role="alert" style="color:#bf3030;font-size:11px"></p>':'');
 }
 function ra(){
-  mountOptionalFeatures({root:R('#optional-features'),getDesign:()=>Y,getAssembly:()=>kt,getNet:()=>Xe,products:()=>allProducts(Y),resolve:id=>Me(Y,id),commit:de,open:MA,close:()=>R('#modal').close(),select:VA,toast:pe});
+  const {showBuses}=mountOptionalFeatures({root:R('#optional-features'),getDesign:()=>Y,getAssembly:()=>kt,getNet:()=>Xe,products:()=>allProducts(Y),resolve:id=>Me(Y,id),commit:de,open:MA,close:()=>R('#modal').close(),select:VA,toast:pe});
+  R('#inspector').onclick=event=>{
+    if(event.target.closest('[data-cresnet-config]')) showBuses();
+  };
   if(!R('#explode-scope')){
     const scope=document.createElement('select');scope.id='explode-scope';
     scope.setAttribute('aria-label','拆解范围');scope.title='拆解范围';
@@ -277,8 +297,7 @@ function ra(){
       }
       const button=event.target.closest('[data-terminal-connect]');
       if(!button) return;
-      MA('端子连接 '+button.dataset.terminalConnect,'');
-      renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId:button.dataset.terminalConnect,onSaved:()=>{R('#modal').close();pe('接线已保存');}});
+      openTerminalConnectionDialog(button.dataset.terminalConnect);
     });
     R('#inspector').addEventListener('change',event=>{
       const pduField=event.target.closest('[data-pdu-orientation],[data-pdu-size],[data-pdu-outlet]');
@@ -336,7 +355,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
   <div class="spec-row"><span>\u94DC\u786C\u7EBF\u7AEF\u5B50\u8303\u56F4</span><strong>${wireRange}</strong></div>
   ${a.icn?`<div class="spec-row"><span>Icn</span><strong>${a.icn} kA</strong></div>`:""}
   ${a.conditionalShort?`<div class="spec-row"><span>\u6761\u4EF6\u77ED\u8DEF\u7535\u6D41</span><strong>${a.conditionalShort} kA \xB7 \u975E\u72EC\u7ACB\u5206\u65AD\u80FD\u529B</strong></div>`:""}
-  <p class="footnote" style="margin-top:10px">${it(a.availability)}</p>`}function As(){let a=es(),t=kt.nodes.find(f=>f.id===je)||a&&kt.nodes.find(f=>f.id===a.id);if(EA){let f=Xe.wires.find(c=>c.id===EA),u=Je.filter(c=>c.wire===f.id||c.text.includes(f.from)),p=fr(f.section,f.method||"B1",f.ambient||40,f.bunched||1,f.loaded||(Y.supply==="three"?3:2));return R("#inspector").innerHTML=`<section class="side-section"><div class="section-head"><h2>\u5BFC\u7EBF\u5C5E\u6027</h2><span class="tag">${f.conductor}</span></div>
+  <p class="footnote" style="margin-top:10px">${it(a.availability)}</p>`}function As(){let a=es(),t=kt.nodes.find(f=>f.id===je)||a&&kt.nodes.find(f=>f.id===a.id);const selectedWire=EA&&Xe.wires.find(c=>c.id===EA);if(EA&&!selectedWire)EA=null;if(selectedWire?.bridgeJumper)return showDimmerBridgeJumper(selectedWire);if(selectedWire?.cresnet||selectedWire?.daliLoop||selectedWire?.rs485||selectedWire?.qsLink||selectedWire?.class==='signal')return showBusWire(selectedWire);if(selectedWire){let f=selectedWire,u=Je.filter(c=>c.wire===f.id||c.text.includes(f.from)),p=fr(f.section,f.method||"B1",f.ambient||40,f.bunched||1,f.loaded||(Y.supply==="three"?3:2));return R("#inspector").innerHTML=`<section class="side-section"><div class="section-head"><h2>\u5BFC\u7EBF\u5C5E\u6027</h2><span class="tag">${f.conductor}</span></div>
     <div class="wire-inspector-end"><strong>FROM</strong><br>${it(f.from)}<br><strong>TO</strong><br>${it(f.to)}</div>
     <p class="tiny">${it(f.scope)}</p><div class="metric-pair"><div><small>\u5F53\u524D\u622A\u9762</small><strong>${f.section}</strong><em>mm\xB2</em></div><div><small>\u81EA\u52A8\u8BA1\u7B97</small><strong>${f.autoSection}</strong><em>mm\xB2</em></div></div>
     ${Bt("\u5BFC\u7EBF\u622A\u9762\u8986\u76D6",`<select id="wire-section">${re(bA.map(c=>[c,c+" mm\xB2"]),f.section)}</select>`)}
@@ -353,6 +372,8 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
       ${f.kind!=="spd"?`<label class="switch-label" style="margin-top:15px"><input id="node-on" class="switch" type="checkbox" ${Y.states[t.id]!==!1?"checked":""}>\u5408\u95F8 / \u6295\u5165</label>`:""}`:""}
       ${t?positionPanel(t.id):""}${t?.role==="module"?`<section class="side-section"><h3>通道备注</h3>${moduleAddressFields(t.module)}<div class="channel-label-grid">${Object.keys(t.module?.channelLabels||t.module?.channels||{}).length?Object.keys({...(t.module?.channels||{}),...(t.module?.channelLabels||{})}).sort((a,b)=>+a-+b).map(ch=>{const lab=t.module?.channelLabels?.[ch]||"";return Bt("CH"+ch,`<input data-insp-ch-label="${it(t.id)}" data-ch="${ch}" maxlength="80" value="${it(lab)}" placeholder="灯具 / 设备">`)}).join(""):"<p class=\"tiny\">无通道</p>"}</div>
       ${modulePowerDescription(t.product)?`<p class="condition">${it(modulePowerDescription(t.product))}</p>`:''}
+      ${isDinDali2(t.product)?`<p class="condition" id="dali-config-summary">${it(daliSettingsSummary(t.module,t.product))}</p>`:''}
+      ${isCresnetController(t.product)||isCresnetReceiver(t.product)||isCresnetChainSupply(t.product)?'<button class="btn" data-cresnet-config style="width:100%;margin-top:8px">配置 Cresnet 总线</button>':''}
       ${!isMainsFedModule(t.product)?'':Bt(t.product.loadPowerInput==='LN'?"灯具／设备负载的支路空开":"对应支路空开（一对一）",`<select id="insp-mod-protect">${re(breakerOptions(t.id),t.module?.protectId||"")}</select>`)}
       <button class="btn" data-explode-module="${it(t.id)}" style="width:100%;margin-top:8px">单模块拆解与接线</button><button class="btn" id="edit-module" style="width:100%;margin-top:8px">${Ut("pencil")}编辑模块</button>${t.product.kind==='terminal'?`<button class="btn primary" data-terminal-connect="${it(t.id)}" style="width:100%;margin-top:8px">${Ut('cable')}连接端子</button>`:''}</section>`:""}<div class="tools" style="margin-top:15px"><button class="btn" id="device-library">${Ut("library")}\u5668\u4EF6\u5E93</button>${t?`<button class="btn danger" id="remove-device">${Ut("trash-2")}\u79FB\u9664\u8BBE\u5907</button>`:""}</div>
       <button class="btn" id="project-settings" style="width:100%;margin-top:12px">${Ut("settings-2")}项目信息与设计条件</button></section>
@@ -403,16 +424,202 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     ${s.slice(0,8).map(f=>`<div class="spec-row"><span>${it(f.name)}</span><strong>${f.enabled?f.watts+" W":"\u4E0D\u8BA1\u5165"}<br><small>${it(f.powerCell||"\u81EA\u5B9A\u4E49")}</small></strong></div>`).join("")}
     ${s.length>8?`<p class="tiny">\u53E6 ${s.length-8} \u6761\uFF0C\u89C1\u6E90\u8868\u6620\u5C04\u3002</p>`:""}
     ${n.slice(0,3).map(f=>`<p class="condition ${f.level==="error"?"error":"warn"}">${it(f.text)}</p>`).join("")}
-  </section>`;let d=(f,u,p=!1)=>de(c=>c.circuits.find(v=>v.id===a.id)[f]=u,p);R("#c-name").onchange=f=>d("name",f.target.value.trim()||a.name),R("#c-pf")&&(R("#c-pf").onchange=f=>d("pf",+f.target.value)),R("#c-phase").onchange=f=>d("phase",f.target.value,!0),R("#c-on").onchange=f=>d("on",f.target.checked),R("#c-product").onchange=f=>{let u=f.target.value==="auto"?null:f.target.value;de(p=>{let c=p.circuits.find(v=>v.id===a.id);c.productId=u,(Me(p,u)||kA(p,c).product).kind==="rcbo"&&(c.rcdProductId=null)},!0)},R("#c-rcd")?.addEventListener("change",f=>d("rcdProductId",f.target.value==="none"?null:f.target.value,!0)),R("#c-method")&&(R("#c-method").onchange=f=>d("method",f.target.value)),R("#c-temp")&&(R("#c-temp").onchange=f=>d("ambient",+f.target.value)),R("#c-bunched")&&(R("#c-bunched").onchange=f=>d("bunched",+f.target.value)),R("#c-length")&&kU("#c-length",1,500,f=>d("length",f)),R("#c-wire")&&(R("#c-wire").onchange=f=>d("wire",f.target.value==="auto"?null:+f.target.value)),R("#inspect-product").onclick=()=>Uo(r.id),R("#inspect-part-source")?.addEventListener("click",()=>Uo(t.product.id)),R("#remove-device").onclick=()=>cX(t?.id||a.id),R("#device-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")},R("#trip").onclick=()=>{Ge.trip=Ge.trip===a.id?null:a.id,ra()},Ye()}function $a(a,t){return`<div class="table-wrap"><table><thead><tr>${a.map(e=>`<th>${e}</th>`).join("")}</tr></thead><tbody>${t.join("")}</tbody></table></div>`}function rs(){document.querySelectorAll("[data-tab]").forEach(a=>a.classList.toggle("active",a.dataset.tab===BA)),R("#pane").classList.toggle("active",BA!=="assembly"),R("#overlay").style.display=BA==="assembly"?"":"none",R("#canvas").style.visibility=BA==="assembly"?"visible":"hidden",BA!=="assembly"&&(BA==="wiring"&&EX(),BA==="schedule"&&J1(),BA==="audit"&&MX(),Ye())}function EX(){let a=je==="Q0"?null:es()||Y.circuits[0];if(!a&&je!=="Q0"){R("#pane").innerHTML=`<div class="pane-head"><h2>\u7AEF\u5B50\u63A5\u7EBF</h2><button class="btn" id="empty-library">${Ut("plus")}\u5668\u4EF6\u5E93</button></div><p class="empty">\u5C1A\u65E0\u672B\u7AEF\u8BBE\u5907\u3002\u6E90\u8868\u8D1F\u8377\u4ECD\u4FDD\u7559\uFF0C\u7B49\u5F85\u5206\u914D\u3002</p>${$a(["\u8D77\u70B9","\u7EC8\u70B9","\u5BFC\u4F53"],Xe.wires.map(r=>`<tr><td>${it(r.from)}</td><td>${it(r.to)}</td><td>${r.conductor}</td></tr>`))}`,R("#empty-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")};return}let t=a?yo(Xe,Y,a.id):new Set(Xe.wires.filter(r=>!r.circuit).map(r=>r.id)),e=Xe.wires.filter(r=>k1||t.has(r.id));R("#pane").innerHTML=`<div class="pane-head"><div><h2>\u7AEF\u5B50\u63A5\u7EBF</h2><p>${a?`${a.id} \xB7 ${it(a.name)} \xB7 ${a.voltage} V`:`Q0 \xB7 ${Y.supply==="three"?"\u4E09\u76F8 4P \xB7 L1/L2/L3/N":"\u5355\u76F8 2P \xB7 L/N"}`} \xB7 \u5B8C\u6574\u8FDE\u63A5 ${Xe.wires.length} \u6761</p></div><button class="btn" id="wires-csv">${Ut("download")}\u63A5\u7EBF\u8868</button></div>
-    <div class="schematic-wrap">${nX(Xe,Y,ts,Ge,a)}</div>
-    <p class="data-note" style="margin:0 0 17px">\u89C6\u56FE\u6298\u53E0\u5206\u914D\u7AEF\u5B50\uFF1B\u4E0B\u8868\u4FDD\u7559\u9010\u7AEF\u5B50\u8FDE\u63A5\u3002\u96F6\u7EBF\u7ECF\u8FC7\u672C\u56DE\u8DEF\u4FDD\u62A4\u5668\u540E\u53EA\u5230\u8D1F\u8F7D\uFF1BPE \u7ED5\u8FC7\u6240\u6709\u5F00\u65AD\u5668\u4EF6\u3002\u8BBE\u5907\u4FE1\u53F7\u8F85\u52A9\u89E6\u70B9\u3001\u8FC7\u6B20\u538B\u6A21\u5757\u53CA\u65BD\u5DE5\u7AEF\u5B50\u7F16\u53F7\u4ECD\u987B\u5382\u5BB6\u6DF1\u5316\u3002</p>
-    <label class="switch-label" style="font-size:11px;margin-bottom:14px"><input class="switch" id="all-wires" type="checkbox" ${k1?"checked":""}>\u663E\u793A\u5168\u67DC\u8FDE\u63A5 <span class="tiny">${e.length} \u6761</span></label>
-    ${$a(["\u5BFC\u4F53","\u8D77\u70B9\u7AEF\u5B50","\u7EC8\u70B9\u7AEF\u5B50","\u622A\u9762","\u7528\u9014","\u72B6\u6001",""],e.map(r=>`<tr class="${EA===r.id?"selected":""}"><td><span style="color:${Ue[r.conductor]}">${r.conductor}</span></td><td><button class="link" data-wire="${it(r.id)}">${it(r.from)}</button></td><td>${it(r.to)}</td><td>${r.section} mm\xB2</td><td>${it(r.scope)}</td><td>${r.connected?"\u5DF2\u8FDE\u63A5":"\u65AD\u5F00"}</td><td><button class="ib" data-wire-toggle="${it(r.id)}" title="${r.connected?"\u65AD\u5F00":"\u6062\u590D"}">${Ut(r.connected?"unplug":"plug")}</button></td></tr>`))}
-    <p class="data-note">\u5165\u6237\u7535\u7F06\u4E0E\u7BB1\u5185\u8FDE\u63A5\u91C7\u7528\u5404\u81EA\u8BA1\u7B97\u6761\u4EF6\u3002\u84DD\u8272\u4E3A N\uFF0C\u9EC4\u7EFF\u53CC\u8272\u4E3A PE\uFF1B\u5206\u914D\u7AEF\u5B50/\u7AEF\u5B50\u6392\u8FD8\u9700\u6309\u7535\u6D41\u3001\u7EBF\u5F84\u3001\u5B54\u6570\u548C\u6BCF\u5B54\u5BFC\u7EBF\u6570\u91CF\u843D\u5B9E\u771F\u5B9E\u9644\u4EF6\u9009\u578B\u3002</p>`,R("#all-wires").onchange=r=>{k1=r.target.checked,EX(),Ye()},R("#wires-csv").onclick=wX,document.querySelectorAll("[data-wire]").forEach(r=>r.onclick=()=>bX(r.dataset.wire)),document.querySelectorAll("[data-wire-toggle]").forEach(r=>r.onclick=()=>{let s=r.dataset.wireToggle;de(n=>n.disconnected=n.disconnected.includes(s)?n.disconnected.filter(o=>o!==s):[...n.disconnected,s])})}function J1(){
+  </section>`;let d=(f,u,p=!1)=>de(c=>c.circuits.find(v=>v.id===a.id)[f]=u,p);R("#c-name").onchange=f=>d("name",f.target.value.trim()||a.name),R("#c-pf")&&(R("#c-pf").onchange=f=>d("pf",+f.target.value)),R("#c-phase").onchange=f=>d("phase",f.target.value,!0),R("#c-on").onchange=f=>d("on",f.target.checked),R("#c-product").onchange=f=>{let u=f.target.value==="auto"?null:f.target.value;de(p=>{let c=p.circuits.find(v=>v.id===a.id);c.productId=u,(Me(p,u)||kA(p,c).product).kind==="rcbo"&&(c.rcdProductId=null)},!0)},R("#c-rcd")?.addEventListener("change",f=>d("rcdProductId",f.target.value==="none"?null:f.target.value,!0)),R("#c-method")&&(R("#c-method").onchange=f=>d("method",f.target.value)),R("#c-temp")&&(R("#c-temp").onchange=f=>d("ambient",+f.target.value)),R("#c-bunched")&&(R("#c-bunched").onchange=f=>d("bunched",+f.target.value)),R("#c-length")&&kU("#c-length",1,500,f=>d("length",f)),R("#c-wire")&&(R("#c-wire").onchange=f=>d("wire",f.target.value==="auto"?null:+f.target.value)),R("#inspect-product").onclick=()=>Uo(r.id),R("#inspect-part-source")?.addEventListener("click",()=>Uo(t.product.id)),R("#remove-device").onclick=()=>cX(t?.id||a.id),R("#device-library").onclick=()=>{pr="library",UA(),innerWidth<=650&&R(".left").classList.add("open")},R("#trip").onclick=()=>{Ge.trip=Ge.trip===a.id?null:a.id,ra()},Ye()}function $a(a,t){return`<div class="table-wrap"><table><thead><tr>${a.map(e=>`<th>${e}</th>`).join("")}</tr></thead><tbody>${t.join("")}</tbody></table></div>`}function rs(){document.querySelectorAll("[data-tab]").forEach(a=>a.classList.toggle("active",a.dataset.tab===BA)),R("#pane").classList.toggle("active",BA!=="assembly"),R("#overlay").style.display=BA==="assembly"?"":"none",R("#canvas").style.visibility=BA==="assembly"?"visible":"hidden",BA!=="assembly"&&(BA==="wiring"&&EX(),BA==="schedule"&&J1(),BA==="audit"&&MX(),Ye())}
+function openTerminalConnectionDialog(terminalId){
+  MA('端子连接 '+terminalId,'');
+  renderTerminalConnections({root:R('#modal-body'),design:Y,resolve:id=>Me(Y,id),commit:de,download:nn,terminalId,
+    onSaved:()=>{R('#modal').close();pe('接线已保存');}});
+}
+function showDimmerBridgeJumper(wire){
+  const endpoint=id=>Xe.ports[id]?.displayTag||id;
+  R('#inspector').innerHTML=`<section class="side-section">
+    <div class="section-head"><h2>厂家跨接件</h2><span class="tag">${it(wire.bridgeTerminal)}</span></div>
+    <p class="condition">${it(endpoint(wire.from))} → ${it(endpoint(wire.to))}</p>
+    <div class="spec-row"><span>连接件</span><strong>${it(wire.material)}</strong></div>
+    <div class="tools"><button class="btn" id="wire-toggle">${Ut(wire.connected?'unplug':'plug')}${wire.connected?'断开连接':'恢复连接'}</button></div>
+  </section>`;
+  R('#wire-toggle').onclick=()=>de(d=>d.disconnected=wire.connected
+    ? [...d.disconnected,wire.id] : d.disconnected.filter(id=>id!==wire.id));
+  Ye();
+}
+function showBusWire(wire){
+  const {terminalTag}=deliveryLabels(Y,Xe);
+  const color=wire.cresnet&&wire.class==='dc'?(wire.conductor==='DC+'?'红芯 24':'黑芯 G'):null;
+  const cable=wire.daliLoop?'DALI 双线':wire.qsLink?wire.scope:wire.class==='signal'?'0–10 V 调光线':wire.material;
+  R('#inspector').innerHTML=`<section class="side-section">
+    <div class="section-head"><h2>${it(wire.scope)}</h2><span class="tag">${it(color||wire.conductor)}</span></div>
+    <p class="condition">${it(terminalTag(wire.from))} → ${it(terminalTag(wire.to))}</p>
+    <div class="spec-row"><span>线缆</span><strong>${it(cable)}</strong></div>
+    <div class="spec-row"><span>线芯截面</span><strong>${wire.section==null?'待核':it(wire.section)+' mm²'}</strong></div>
+    <div class="tools"><button class="btn" id="wire-toggle">${Ut(wire.connected?'unplug':'plug')}${wire.connected?'断开连接':'恢复连接'}</button></div>
+  </section>`;
+  R('#wire-toggle').onclick=()=>de(d=>d.disconnected=wire.connected
+    ? [...d.disconnected,wire.id] : d.disconnected.filter(id=>id!==wire.id));
+  Ye();
+}
+function schematicWires(wires,empty,terminalTag){
+  return wires.length?wires.map(wire=>`<p class="condition" data-schematic-from="${it(wire.from)}" data-schematic-to="${it(wire.to)}" data-schematic-class="${it(wire.class)}">
+    ${it(terminalTag(wire.from))} → ${it(terminalTag(wire.to))}${wire.bridgeJumper?` · ${it(wire.material)}`:''}${wire.connected?'':'（断开）'}
+  </p>`).join(''):`<p class="condition">${it(empty)}</p>`;
+}
+function independentFeedSchematic(loadWires, controlWires, issues, terminalTag, {bridgedGroups,mixedFeeds,invalidMode,cresnetWires,chainPowerWires}){
+  const jumpers=loadWires.filter(wire=>wire.bridgeJumper);
+  const feedWires=loadWires.filter(wire=>!wire.bridgeJumper);
+  const phaseWires=feedWires.filter(wire=>wire.conductor!=='N');
+  const groups=[
+    [`负载相线 ${phaseWires[0]?.conductor||'L'}`, phaseWires, '相线接线待核'],
+    ['负载零线 N', feedWires.filter(wire=>wire.conductor==='N'), '零线接线待核'],
+    ...(bridgedGroups.length ? [['组内跨接 L/N/DIM', jumpers, '跨接待核']] : []),
+    ...(!chainPowerWires||controlWires.length ? [['控制侧 24VDC', controlWires, '待连接 24V 直流电源']] : []),
+    ...(chainPowerWires ? [['串接控制侧 24VDC · 红 24 / 黑 G', chainPowerWires, 'DIN-PWS50 串接电源待核']] : []),
+    ...(cresnetWires ? [['Cresnet 通信 · Y/Z 数据与 G 参考', cresnetWires, '数据端子连接待核']] : []),
+  ];
+  const groupNames=bridgedGroups.map(group=>group.map(channel=>`CH${channel}`).join('+'));
+  const title=groupNames.length ? `DIN-4DIMU4 输出桥接 · ${groupNames.join(' / ')}` : 'DIN-4DIMU4 馈电';
+  let guide='接线前须移除出厂 L/N 共接跳线。完整线路见下表。';
+  if(invalidMode) guide='桥接模式待重新选择。';
+  else if(bridgedGroups.some(group=>!dimmerGroupUsesIncludedJumpers(group))) guide='厂家随附跳线适用于相邻通道。当前组合的跨接件待核，按草案展示。';
+  else if(bridgedGroups.length) guide='每个桥接组使用同一单相支路。设备桥接设置和出厂 L/N 共接跳线须与分组一致，组之间保持隔离。';
+  else if(mixedFeeds) guide='本通道使用独立单相支路，与其他通道和桥接组隔离。出厂 L/N 共接跳线须按分组调整。';
+  return `<section id="independent-feed-schematic" style="padding:14px" aria-label="逐路馈电接线图">
+    <h3>${it(title)}</h3>
+    ${groups.map(([label,wires,empty])=>`<div style="margin-top:10px">
+      <strong>${it(label)}</strong>
+      ${schematicWires(wires,empty,terminalTag)}
+    </div>`).join('')}
+    <p class="data-note">${it(guide)}</p>
+    ${issues.map(issue=>`<p class="condition">${it(issue.text||issue.message)}</p>`).join('')}
+  </section>`;
+}
+function EX(){
+  const independentIds=new Set(kt.nodes.filter(node=>hasIndependentLoadFeeds(node.product)).map(node=>node.id));
+  const net=buildDeliveryNet(Y,kt,Xe);
+  const selectedModule=independentIds.has(je)?Y.modules.find(module=>module.id===je):null;
+  const assigned=Object.values(selectedModule?.channels||{});
+  const dataBuses=Y.buses.filter(isCresnetDataBus);
+  const busIncludes=(bus,id)=>!!id&&(bus.controllerModuleId===id||bus.chainSupplyModuleId===id||bus.deviceModuleIds?.includes(id));
+  const selectedCresnet=dataBuses.some(bus=>busIncludes(bus,je));
+  const serialMasters=Y.modules.filter(m=>m.rs485Meters?.length&&(m.id===je||m.rs485Meters.includes(je)));
+  const serialWires=net.wires.filter(w=>w.rs485&&serialMasters.some(m=>m.id===w.serialMaster));
+  const selectedDali=kt.nodes.find(node=>node.id===je&&daliFieldLineCount(node.product));
+  const selectedPhysical=kt.nodes.find(node=>node.id===je&&!selectedDali&&(loadTopology(node.product)||qsHardware(node.product)));
+  const moduleWires=selectedPhysical?net.wires.filter(w=>!w.rs485&&(w.moduleId===je||
+    [w.from,w.to].some(end=>net.ports[end]?.node===je))):[];
+  const selectedAbb=abbDaliLines(selectedDali?.product)>0;
+  const selectedQs=selectedDali?.product.id==='lutron-lqse-2dal-d';
+  const circuit=je==="Q0"||selectedDali||selectedPhysical||serialMasters.length?null:es()||Y.circuits.find(c=>assigned.includes(c.id))||(selectedCresnet?null:Y.circuits[0]);
+  const matchingModules=Y.modules.filter(module=>independentIds.has(module.id)&&circuit&&
+    Object.values(module.channels||{}).includes(circuit.id));
+  const branchModules=new Set(matchingModules.map(module=>module.id));
+  const cresnetModules=new Set([...branchModules,je]);
+  const cresnetBuses=dataBuses.filter(bus=>[...cresnetModules].some(id=>busIncludes(bus,id)));
+  const chainBuses=cresnetBuses.filter(isCresnetChainBus);
+  const fullChainIds=new Set(chainBuses.filter(bus=>bus.controllerModuleId===je||bus.chainSupplyModuleId===je).map(bus=>bus.id));
+  const cresnetWires=net.wires.filter(wire=>wire.cresnet&&(fullChainIds.has(wire.busId)||
+    [wire.from,wire.to].some(id=>cresnetModules.has(net.ports[id]?.node))));
+  const dataWires=cresnetWires.filter(wire=>wire.class==='comms');
+  const chainPowerWires=chainBuses.length?cresnetWires.filter(wire=>wire.class==='dc'):null;
+  if(!circuit&&je!=="Q0"&&!cresnetBuses.length&&!selectedDali&&!selectedPhysical&&!serialMasters.length){
+    R("#pane").innerHTML=`<div class="pane-head"><h2>端子接线</h2><button class="btn" id="empty-library">${Ut("plus")}器件库</button></div><p class="empty">尚无末端设备。源表负载仍保留，等待分配。</p>${$a(["起点","终点","导体"],net.wires.map(wire=>`<tr><td>${it(wire.from)}</td><td>${it(wire.to)}</td><td>${it(wire.conductor)}</td></tr>`))}`;
+    R("#empty-library").onclick=()=>{pr="library";UA();if(innerWidth<=650)R(".left").classList.add("open");};
+    return;
+  }
+  const configurations=matchingModules.map(module=>({module,groups:dimmerOutputGroups(module.bridgeMode)}));
+  const bridgeGroups=configurations.flatMap(({module,groups})=>(groups||[])
+    .filter(group=>group.length>1).map(channels=>({module,channels})));
+  const bridgedGroups=bridgeGroups.filter(({module,channels})=>module.channels?.[channels[0]]===circuit?.id)
+    .map(({channels})=>channels);
+  const loadWires=net.wires.filter(wire=>wire.circuit===circuit?.id&&
+    [wire.from,wire.to].some(id=>branchModules.has(net.ports[id]?.node)));
+  const controls=selectedDali?new Set([je]):selectedCresnet?cresnetModules:branchModules;
+  const controlWires=net.wires.filter(wire=>wire.class==='dc'&&!wire.cresnet&&controls.has(net.ports[wire.to]?.node));
+  const daliWires=selectedDali?net.wires.filter(wire=>wire.daliLoop&&wire.moduleId===je):[];
+  const gatewayInputs=selectedAbb||selectedQs?net.wires.filter(w=>!w.daliLoop&&(w.moduleFeed||w.class==='comms')&&[w.from,w.to].some(id=>net.ports[id]?.node===je)):[];
+  const wireIds=circuit?yo(net,Y,circuit.id):new Set(selectedCresnet||selectedDali||selectedPhysical||serialMasters.length?[]:net.wires.filter(wire=>!wire.circuit).map(wire=>wire.id));
+  for(const wire of moduleWires) wireIds.add(wire.id);
+  for(const wire of serialWires) wireIds.add(wire.id);
+  for(const wire of daliWires) wireIds.add(wire.id);
+  for(const wire of gatewayInputs) wireIds.add(wire.id);
+  for(const wire of controlWires) wireIds.add(wire.id);
+  for(const wire of cresnetWires) wireIds.add(wire.id);
+  const visibleWires=net.wires.filter(wire=>k1||wireIds.has(wire.id));
+  const wireById=new Map(visibleWires.map(wire=>[wire.id,wire]));
+  const endpoint=id=>net.ports[id]?.displayTag||id;
+  const issues=(net.wiringIssues||[]).filter(issue=>
+    (issue.circuit&&issue.circuit===circuit?.id)||(!issue.circuit&&(branchModules.has(issue.moduleId)||selectedDali&&issue.moduleId===je))||
+    (issue.code?.startsWith('CRESNET_')&&cresnetBuses.length&&(cresnetModules.has(issue.moduleId)||
+      cresnetBuses.some(bus=>bus.id===issue.busId||bus.id===issue.moduleId||bus.controllerModuleId===issue.moduleId||
+        ((bus.controllerModuleId===je||fullChainIds.has(bus.id))&&busIncludes(bus,issue.moduleId))))));
+  const {terminalTag}=deliveryLabels(Y,net);
+  const controllerView=cresnetBuses.some(bus=>bus.controllerModuleId===je);
+  const moduleSchematic=selectedPhysical?`<section id="module-schematic" style="padding:14px"><h3>${it(je)} · ${it(selectedPhysical.product.name)}</h3>
+    ${Object.entries({power:'市电与负载接线',dc:'控制侧直流供电',comms:'总线通信',signal:'模拟信号',network:'以太网'}).map(([kind,title])=>{
+      const group=moduleWires.filter(w=>(w.class||'power')===kind);
+      return group.length?`<h4>${title}</h4>${schematicWires(group,'',terminalTag)}`:'';
+    }).join('')}
+    ${!moduleWires.length&&!serialWires.length?'<p>尚未配置接线。</p>':''}
+    ${(net.wiringIssues||[]).filter(i=>i.moduleId===je && i.code!=='RS485_CONNECTION_UNRESOLVED').map(i=>`<p class="condition">${it(i.text||i.message)}</p>`).join('')}</section>`:'';
+  const serialSchematic=serialMasters.map(m=>`<section id="rs485-schematic"><h3>${it(m.id)} · COM1 / RS-485</h3>
+    <p>${it([m.id,...m.rs485Meters.map(id=>id||'设备待选')].join(' → '))} · ${m.rs485MetersLength==null?'线长待核':it(m.rs485MetersLength)+' m'}</p>
+    ${schematicWires(serialWires.filter(w=>w.serialMaster===m.id),'串接路径待核',terminalTag)}
+    ${(net.wiringIssues||[]).filter(i=>i.code?.startsWith('RS485_')&&i.moduleId===m.id).map(i=>`<p class="condition">${it(i.text)}</p>`).join('')}
+    <p class="data-note">${it(rs485CableNote)}</p></section>`).join('');
+  const schematic=selectedDali?`<section id="dali-schematic" style="padding:14px" aria-label="DALI 接线">
+    <h3>${it(isDinDali2(selectedDali.product)?daliSettingsSummary(selectedDali.module,selectedDali.product):selectedDali.product.name+' · 内置 DALI 电源')}</h3>
+    ${selectedAbb||selectedQs?`<h4>网关交流供电</h4>${schematicWires(gatewayInputs.filter(w=>w.moduleFeed),'请分配保护支路。',terminalTag)}<h4>${selectedAbb?'KNX':'QS Link'} 总线</h4>${schematicWires(gatewayInputs.filter(w=>w.class==='comms'),'请核对控制总线连接。',terminalTag)}`:chainPowerWires?'':`<h4>控制侧供电 · NET 24/G 或 LAN PoE</h4>${schematicWires(controlWires,'方案未分配 24V 端子接线；请核对实际控制电源。',terminalTag)}`}
+    ${cresnetBuses.length?`<h4>Cresnet · Y/Z/G</h4>${schematicWires(dataWires,'数据端子连接待核',terminalTag)}${chainPowerWires?`<h4>串接控制供电 · 24/G</h4>${schematicWires(chainPowerWires,'串接电源待核',terminalTag)}`:''}`:''}
+    ${Array.from({length:daliFieldLineCount(selectedDali.product)},(_,i)=>{
+      const loop=i+1, field=selectedDali.module.daliFieldLoops?.[loop];
+      const capacity=daliFieldCapacity(selectedDali.product,selectedDali.module,loop,id=>kt.nodes.find(n=>n.id===id)?.product);
+      return `<h4>${fieldLineLabel(selectedDali.product,loop)} · ${selectedQs?'DA 左 / 右':'DA+ / DA−'}</h4>${field?'<p>'+it([field.name,fieldBudgetLabel(field,capacity)].filter(Boolean).join(' · '))+'</p>':''}${schematicWires(daliWires.filter(w=>w.daliLoop===loop),!isDinDali2(selectedDali.product)?'内置总线电源':daliPowerMode(selectedDali.module)==='INT'?'INT · 内置总线电源':'总线电源接线待核',terminalTag)}`;
+    }).join('')}
+    ${issues.map(issue=>`<p class="condition">${it(issue.text||issue.message)}</p>`).join('')}
+  </section>`:selectedPhysical?moduleSchematic:branchModules.size
+    ? independentFeedSchematic(loadWires,controlWires,issues,terminalTag,{
+      bridgedGroups,mixedFeeds:bridgeGroups.length>0,invalidMode:configurations.some(({groups})=>!groups),
+      cresnetWires:cresnetBuses.length?dataWires:null,chainPowerWires
+    })
+    : cresnetBuses.length?`<section id="cresnet-schematic" style="padding:14px" aria-label="Cresnet 数据接线">
+      <h3>Cresnet 通信 · Y/Z 数据与 G 参考</h3>${schematicWires(dataWires,'数据端子连接待核',terminalTag)}
+      ${chainPowerWires?`<h4>DIN-PWS50 串接控制供电 · 红 24 / 黑 G</h4>${schematicWires(chainPowerWires,'DIN-PWS50 串接电源待核',terminalTag)}`:''}
+      ${controllerView||!chainPowerWires||controlWires.length?`<h4>${controllerView?'DIN-AP4 主机供电':'成员 24V 控制供电'}</h4>${schematicWires(controlWires,controllerView?'主机供电可选 LAN PoE 或 PWR 24/G，请核对实际电源。':'待连接 24V 直流电源',terminalTag)}`:''}
+      ${issues.map(issue=>`<p class="condition">${it(issue.text||issue.message)}</p>`).join('')}
+    </section>`:serialMasters.length?'':nX(Xe,Y,ts,Ge,circuit);
+  R("#pane").innerHTML=`<div class="pane-head"><div><h2>端子接线</h2><p>${circuit?`${circuit.id} · ${it(circuit.name)} · ${circuit.voltage} V`:(selectedDali||selectedPhysical)?`${it(je)} · ${it((selectedDali||selectedPhysical).product.name)}`:selectedCresnet?`${it(je)} · Cresnet`:serialMasters.length?`${it(je)} · RS-485`:`Q0 · ${Y.supply==="three"?"三相 4P · L1/L2/L3/N":"单相 2P · L/N"}`} · 完整连接 ${net.wires.length} 条</p></div><button class="btn" id="wires-csv">${Ut("download")}接线表</button></div>
+    <div class="schematic-wrap">${schematic}${serialSchematic}</div>
+    <p class="data-note" style="margin:0 0 17px">下表保留逐端子连接。PE 绕过所有开断器件。设备信号辅助触点、过压模块及施工端子编号仍须厂家深化。</p>
+    <label class="switch-label" style="font-size:11px;margin-bottom:14px"><input class="switch" id="all-wires" type="checkbox" ${k1?"checked":""}>显示全柜连接 <span class="tiny">${visibleWires.length} 条</span></label>
+    ${$a(["导体","起点端子","终点端子","截面 / 连接件","用途","状态",""],visibleWires.map(wire=>`<tr class="${EA===wire.id?"selected":""}" data-wire-from="${it(wire.from)}" data-wire-to="${it(wire.to)}">
+      <td><span style="color:${Ue[wire.conductor]||"inherit"}">${it(wire.conductor)}</span></td>
+      <td><button class="link" data-wire="${it(wire.id)}">${it(endpoint(wire.from))}</button></td>
+      <td>${it(endpoint(wire.to))}</td>
+      <td>${wire.bridgeJumper?it(wire.material):wire.section==null?"待核":it(wire.section)+" mm²"}</td>
+      <td>${it(wire.scope)}</td><td>${wire.connected?"已连接":"断开"}</td>
+      <td>${wire.terminalConnection?"":`<button class="ib" data-wire-toggle="${it(wire.id)}" title="${wire.connected?"断开":"恢复"}">${Ut(wire.connected?"unplug":"plug")}</button>`}</td>
+    </tr>`))}
+    <p class="data-note">入户电缆与箱内连接采用各自计算条件。蓝色为 N，黄绿双色为 PE。分配端子和端子排需按电流、线径、孔数和每孔导线数量选型。</p>`;
+  R("#all-wires").onchange=event=>{k1=event.target.checked;EX();Ye();};
+  R("#wires-csv").onclick=wX;
+  R("#pane").querySelectorAll("[data-wire]").forEach(button=>button.onclick=()=>{
+    const wire=wireById.get(button.dataset.wire);
+    if(wire.terminalConnection) openTerminalConnectionDialog(wire.terminalId);
+    else bX(wire.id);
+  });
+  R("#pane").querySelectorAll("[data-wire-toggle]").forEach(button=>button.onclick=()=>{
+    const id=button.dataset.wireToggle;
+    de(d=>d.disconnected=d.disconnected.includes(id)?d.disconnected.filter(wireId=>wireId!==id):[...d.disconnected,id]);
+  });
+}
+function J1(){
   if(isSimpleMode(Y)){
     if(Ja==="loads"||Ja==="circuits") Ja="channels";
     const feeds=new Map(resolveModuleFeedBindings(kt,Y).map(b=>[b.moduleId,b]));
-    const rows=buildChannelRows(Y,id=>Me(Y,id)).map(r=>({...r,breaker:feeds.get(r.moduleId)?.breakerId||r.breaker}));
+    const channelFeeds=new Map((Xe.moduleFeedBindings||[]).filter(b=>b.channel).map(b=>[`${b.moduleId}:${b.channel}`,b]));
+    const rows=buildChannelRows(Y,id=>Me(Y,id)).map(row=>{
+      const feed=channelFeeds.get(`${row.moduleId}:${row.channel}`);
+      return {...row,breaker:feed?.breakerId||feeds.get(row.moduleId)?.breakerId||row.breaker,
+        rcd:feed&&feed.sourceId!==feed.breakerId?feed.sourceId:row.rcd};
+    });
     let t="";
     if(Ja==="channels"){
       t=$a(["模块","名称","型号","通道","备注","端子","对应空开","关联漏保"],rows.map(r=>`<tr>
@@ -429,7 +636,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     R("#pane").innerHTML=`<div class="pane-head"><div><h2>通道与设备</h2><p>${(Y.modules||[]).length} 个模块 · ${rows.filter(r=>r.label).length} 条已备注通道</p></div>
       <div class="tools"><button id="schedule-csv" class="btn">${Ut("download")}通道清单 CSV</button></div></div>
       <div class="subnav"><button data-data="channels" class="${Ja==="channels"?"active":""}">通道清单</button><button data-data="bom" class="${Ja==="bom"?"active":""}">器件清单</button></div>
-      ${t}<p class="data-note">每个模块对应一个支路空开，总空开为上游。未指定时按安装顺序对应。</p>`;
+      ${t}<p class="data-note">常规模块未指定支路时按安装顺序对应。DIN-4DIMU4 逐路选择独立馈电回路。</p>`;
     document.querySelectorAll("[data-data]").forEach(e=>e.onclick=()=>{Ja=e.dataset.data,J1(),Ye()});
     document.querySelectorAll("[data-select]").forEach(e=>e.onclick=()=>{VA(e.dataset.select),innerWidth<=1e3&&R(".right").classList.add("open")});
     document.querySelectorAll("[data-product]").forEach(e=>e.onclick=()=>Uo(e.dataset.product));
@@ -447,7 +654,7 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
         <td class="source-cell">${it(e.powerCell||"\u81EA\u5B9A\u4E49")}</td><td>${it(e.zone)}</td><td>${it(e.name)}</td>
         <td><input data-load-watts="${e.id}" value="${e.watts}" type="number" min="0" max="100000" ${e.metadata?"disabled":""} aria-label="${it(e.name)}\u529F\u7387"></td><td>${Js.loads.find(r=>r.id===e.id)?.watts??"\u2014"}</td><td>${e.voltage}</td>
         <td>${it(e.socket)}</td><td>${e.metadata?"\u2014":`<select data-connection="${e.id}" aria-label="${it(e.name)}\u8BBE\u8BA1\u8FDE\u63A5">${re([["","\u6309\u6E90\u8868"],...[16,20,25,32,40,63,80,100,125].map(r=>[r,"\u56FA\u5B9A\u63A5\u7EBF \u2265"+r+"A"])],Y.connections?.[e.id]?.amps||"")}</select>`}</td>
-        <td>${e.metadata?"Q0 \xB7 \u603B\u5F00 / \u7BB1\u4F53\u5143\u4FE1\u606F":`<select data-load-circuit="${e.id}" aria-label="${it(e.name)}\u6240\u5C5E\u56DE\u8DEF">${re([["","\u672A\u5206\u914D"],...Y.circuits.filter(r=>r.voltage===e.voltage).map(r=>[r.id,r.id+" "+r.name])],Y.circuits.find(r=>r.loadIds.includes(e.id))?.id||"")}</select>`}</td></tr>`));else{let e=new Map;kt.nodes.forEach(r=>{let s=r.product.id;e.has(s)?e.get(s).count++:e.set(s,{product:r.product,count:1})}),t=$a(["\u4EA7\u54C1","\u8BA2\u5355\u53F7","\u6570\u91CF","\u5B9E\u9645\u5BBD\u5EA6","\u5408\u8BA1\u6A21\u6570","\u4F9D\u636E"],[...e.values()].map(({product:r,count:s})=>`<tr><td><button class="link" data-product="${it(r.id)}">${it(r.name)}</button></td><td>${it(gA(r))}</td><td>${s}</td><td>${r.width} mm</td><td>${r.modules*s} M</td><td>${it(r.source.file)} p.${r.source.pages}</td></tr>`)),t+=`<p class="data-note">\u53E6\u542B ${kt.box.name} 1 \u53F0\u3001\u5BFC\u8F68 ${kt.box.rows} \u6761\u3001\u4E00\u6761 N \u6392\u4E0E\u4E00\u6761 PE \u6392\u3001\u5206\u914D\u7AEF\u5B50\u3001\u51FA\u7BB1\u7AEF\u5B50\u4E0E\u95E8\u8DE8\u63A5\u3002N/PE \u6BCF\u56DE\u8DEF\u91C7\u7528\u72EC\u7ACB\u7AEF\u5B50\u7F16\u53F7\uFF1B\u5B9E\u9645\u9644\u4EF6\u7684\u989D\u5B9A\u7535\u6D41\u3001\u5B54\u6570\u3001\u5B89\u88C5\u548C\u8BA2\u5355\u53F7\u4ECD\u987B\u5382\u5BB6\u786E\u8BA4\u3002</p>`}R("#pane").innerHTML=`<div class="pane-head"><div><h2>\u56DE\u8DEF\u4E0E\u8D1F\u8377</h2><p>${Y.circuits.length} \u6761\u56DE\u8DEF \xB7 \u5F53\u524D\u8BA1\u5165 ${(a/1e3).toFixed(2)} kW \xB7 \u539F\u8868 56.10 kW</p></div>
+        <td>${e.metadata?"Q0 \xB7 \u603B\u5F00 / \u7BB1\u4F53\u5143\u4FE1\u606F":`<select data-load-circuit="${e.id}" aria-label="${it(e.name)}\u6240\u5C5E\u56DE\u8DEF">${re([["","\u672A\u5206\u914D"],...Y.circuits.filter(r=>r.voltage===e.voltage).map(r=>[r.id,r.id+" "+r.name])],Y.circuits.find(r=>r.loadIds.includes(e.id))?.id||"")}</select>`}</td></tr>`));else{let e=new Map;kt.nodes.forEach(r=>{let s=r.product.id;e.has(s)?e.get(s).count++:e.set(s,{product:r.product,count:1})}),t=$a(["\u4EA7\u54C1","\u8BA2\u5355\u53F7","\u6570\u91CF","\u5B9E\u9645\u5BBD\u5EA6","\u5408\u8BA1\u6A21\u6570","\u4F9D\u636E"],[...e.values()].map(({product:r,count:s})=>`<tr><td><button class="link" data-product="${it(r.id)}">${it(r.name)}</button></td><td>${it(gA(r))}</td><td>${s}</td><td>${r.width} mm</td><td>${r.modules*s} M</td><td>${it(r.source.file)}${r.source.pages?` · ${it(r.source.pages)}`:""}</td></tr>`)),t+=`<p class="data-note">\u53E6\u542B ${kt.box.name} 1 \u53F0\u3001\u5BFC\u8F68 ${kt.box.rows} \u6761\u3001\u4E00\u6761 N \u6392\u4E0E\u4E00\u6761 PE \u6392\u3001\u5206\u914D\u7AEF\u5B50\u3001\u51FA\u7BB1\u7AEF\u5B50\u4E0E\u95E8\u8DE8\u63A5\u3002N/PE \u6BCF\u56DE\u8DEF\u91C7\u7528\u72EC\u7ACB\u7AEF\u5B50\u7F16\u53F7\uFF1B\u5B9E\u9645\u9644\u4EF6\u7684\u989D\u5B9A\u7535\u6D41\u3001\u5B54\u6570\u3001\u5B89\u88C5\u548C\u8BA2\u5355\u53F7\u4ECD\u987B\u5382\u5BB6\u786E\u8BA4\u3002</p>`}R("#pane").innerHTML=`<div class="pane-head"><div><h2>\u56DE\u8DEF\u4E0E\u8D1F\u8377</h2><p>${Y.circuits.length} \u6761\u56DE\u8DEF \xB7 \u5F53\u524D\u8BA1\u5165 ${(a/1e3).toFixed(2)} kW \xB7 \u539F\u8868 56.10 kW</p></div>
     <div class="tools"><button id="add-circuit" class="btn">${Ut("plus")}\u56DE\u8DEF</button><button id="schedule-csv" class="btn">${Ut("download")}CSV</button></div></div>
     <div class="subnav"><button data-data="circuits" class="${Ja==="circuits"?"active":""}">\u56DE\u8DEF\u8BA1\u7B97</button><button data-data="loads" class="${Ja==="loads"?"active":""}">117 \u6761\u6E90\u8868\u6620\u5C04</button><button data-data="bom" class="${Ja==="bom"?"active":""}">\u5668\u4EF6\u6E05\u5355</button></div>
     ${ta(Y).length?`<div class="callout">${ta(Y).length} \u6761\u6E90\u8868\u8D1F\u8377\u5C1A\u672A\u5206\u914D\uFF0C\u5C1A\u672A\u8BA1\u5165\u5DF2\u88C5\u56DE\u8DEF\u3002</div>`:""}${t}<p class="data-note">\u6807\u79F0\u8D1F\u8377\u6765\u81EA\u6E90\u8868\u6216\u7F16\u8F91\u503C\uFF0C\u4E0D\u662F\u4FDD\u62A4\u5668\u4EF6\u7684\u56FA\u6709\u53C2\u6570\u30020 W \u9884\u7559\u63D2\u5EA7\u3001\u8BBE\u5907\u91CD\u590D\u8FB9\u754C\u548C\u9505\u7089\u8F93\u5165\u529F\u7387\u9700\u8981\u786E\u8BA4\uFF1B\u672A\u7B7E\u8BA4\u6570\u636E\u4E0D\u5F97\u636E\u6B64\u76F4\u63A5\u65BD\u5DE5\u3002</p>`,document.querySelectorAll("[data-data]").forEach(e=>e.onclick=()=>{Ja=e.dataset.data,J1(),Ye()}),document.querySelectorAll("[data-select]").forEach(e=>e.onclick=()=>{VA(e.dataset.select),innerWidth<=1e3&&R(".right").classList.add("open")}),document.querySelectorAll("[data-product]").forEach(e=>e.onclick=()=>Uo(e.dataset.product)),document.querySelectorAll("[data-load-enabled]").forEach(e=>e.onchange=r=>de(s=>s.loads.find(n=>n.id===e.dataset.loadEnabled).enabled=r.target.checked)),document.querySelectorAll("[data-load-watts]").forEach(e=>e.onchange=r=>{let s=r.target.valueAsNumber;if(!Number.isFinite(s)||s<0||s>1e5){pe("\u8D1F\u8377\u5E94\u5728 0\u2013100000 W \u8303\u56F4\u5185"),J1();return}de(n=>n.loads.find(o=>o.id===e.dataset.loadWatts).watts=s)}),document.querySelectorAll("[data-load-circuit]").forEach(e=>e.onchange=r=>{let s=e.dataset.loadCircuit,n=r.target.value;de(o=>{o.circuits.forEach(i=>i.loadIds=i.loadIds.filter(l=>l!==s)),n&&o.circuits.find(i=>i.id===n).loadIds.push(s)},!0)}),document.querySelectorAll("[data-connection]").forEach(e=>e.onchange=r=>de(s=>{s.connections??(s.connections={}),r.target.value?s.connections[e.dataset.connection]={mode:"fixed",amps:+r.target.value}:delete s.connections[e.dataset.connection]})),R("#add-circuit").onclick=JU,R("#schedule-csv").onclick=zX}function MX(){let a="";zr==="issues"?a=`<div class="callout">\u6709\u9650\u89C4\u5219\u68C0\u67E5\u4E0D\u80FD\u7ED9\u51FA\u56FD\u5BB6\u6807\u51C6\u201C\u6574\u4F53\u5408\u683C\u201D\u7ED3\u8BBA\u3002\u7EA2\u8272\u9879\u5FC5\u987B\u4FEE\u6B63\uFF0C\u5F85\u6838\u9879\u9700\u8981\u73B0\u573A\u8F93\u5165\u3001\u94ED\u724C\u6216\u5382\u5BB6\u786E\u8BA4\u3002</div>
@@ -514,9 +721,9 @@ function VX(a){const wireRange=Number.isFinite(a.minWire)&&Number.isFinite(a.max
     }}
 function Uo(a){let t=Me(Y,a);t&&(MA("\u4EA7\u54C1\u53C2\u6570 \xB7 "+t.name,`<div class="inspector-top">${an(t)}<div><strong>${it(t.name)}</strong><small>${it(gA(t))}</small></div></div>${VX(t)}
     <p style="margin-top:18px">${it(t.note||"\u989D\u5B9A\u53C2\u6570\u53D6\u81EA\u5BF9\u5E94\u578B\u53F7\u8D44\u6599\uFF0C\u4E0D\u5141\u8BB8\u7F16\u8F91\u989D\u5B9A\u7535\u6D41\u540E\u4FDD\u7559\u539F\u8BA2\u5355\u53F7\u3002")}</p>
-    <p>\u6765\u6E90\uFF1A${it(t.source.file)}\uFF0C\u7B2C ${t.source.pages} \u9875\u3002\u6280\u672F\u53C2\u6570\u7684\u6838\u5B9E\u4E0D\u7B49\u4E8E\u5730\u533A\u4F9B\u8D27\u3001CCC \u9002\u7528\u548C\u672C\u9879\u76EE\u5B89\u88C5\u517C\u5BB9\u6027\u5DF2\u786E\u8BA4\u3002</p>
+    <p>来源 ${it(t.source.file)}${t.source.pages?` · ${it(t.source.pages)}`:''}。\u6280\u672F\u53C2\u6570\u7684\u6838\u5B9E\u4E0D\u7B49\u4E8E\u5730\u533A\u4F9B\u8D27\u3001CCC \u9002\u7528\u548C\u672C\u9879\u76EE\u5B89\u88C5\u517C\u5BB9\u6027\u5DF2\u786E\u8BA4\u3002</p>
     <div class="tools">${t.source.url?`<a href="${it(t.source.url)}" target="_blank" rel="noreferrer" class="btn">\u8D44\u6599\u6765\u6E90</a>`:""}
-    <button class="btn primary" id="product-install">${Ut("plus")}\u88C5\u5165\u8BBE\u5907</button>${t.custom?'<button class="btn" id="product-edit">\u7F16\u8F91\u578B\u53F7</button><button class="btn danger" id="product-delete">\u5220\u9664\u81EA\u5B9A\u4E49\u578B\u53F7</button>':""}</div>`),R("#product-install").onclick=()=>{R("#modal").close(),PX(a)},R("#product-edit")?.addEventListener("click",()=>{R("#modal").close(),qX(a)}),R("#product-delete")?.addEventListener("click",()=>{if(kt.nodes.some(e=>e.product.id===a))return pe("\u8BE5\u578B\u53F7\u4ECD\u88AB\u88C5\u914D\u8BBE\u5907\u4F7F\u7528\uFF0C\u8BF7\u5148\u79FB\u9664\u6216\u66FF\u6362\u5B9E\u4F8B");R("#modal").close(),de(e=>e.customProducts=e.customProducts.filter(r=>r.id!==a),!0),pe("\u5DF2\u4ECE\u81EA\u5B9A\u4E49\u5E93\u79FB\u9664\uFF0C\u53EF\u64A4\u9500")}))}function qX(a=null){let t=a?Me(Y,a):null;if(t&&!t.custom)return pe("内置厂家参数不可直接改写；可新增自定义型号");let e=t||{id:"USR-"+crypto.randomUUID(),brand:"",name:"",sku:"",kind:"gateway",poles:2,amps:null,width:54,height:94,depth:59,minWire:1,maxWire:16,neutralSide:"left",protectedPoles:0,residual:30,rcdType:"A",icn:null,backup:40,voltage:"",sourceURL:"",protocol:["din"],channels:null,smart:!0},r=kt.nodes.filter(s=>s.product.id===e.id).length,tplActive=DIN_SIZE_TEMPLATES.find(s=>Math.abs(s.width-e.width)<.2&&Math.abs(s.height-e.height)<1&&Math.abs(s.depth-e.depth)<1)?.id||"";
+    <button class="btn primary" id="product-install">${Ut("plus")}\u88C5\u5165\u8BBE\u5907</button>${t.custom?'<button class="btn" id="product-edit">\u7F16\u8F91\u578B\u53F7</button><button class="btn danger" id="product-delete">\u5220\u9664\u81EA\u5B9A\u4E49\u578B\u53F7</button>':""}</div>`),R("#product-install").onclick=()=>{R("#modal").close(),PX(a)},R("#product-edit")?.addEventListener("click",()=>{R("#modal").close(),qX(a)}),R("#product-delete")?.addEventListener("click",()=>{if(kt.nodes.some(e=>e.product.id===a))return pe("\u8BE5\u578B\u53F7\u4ECD\u88AB\u88C5\u914D\u8BBE\u5907\u4F7F\u7528\uFF0C\u8BF7\u5148\u79FB\u9664\u6216\u66FF\u6362\u5B9E\u4F8B");R("#modal").close(),de(e=>e.customProducts=e.customProducts.filter(r=>r.id!==a),!0),pe("\u5DF2\u4ECE\u81EA\u5B9A\u4E49\u5E93\u79FB\u9664\uFF0C\u53EF\u64A4\u9500")}))}function qX(a=null){let t=a?Me(Y,a):null;if(t&&!t.custom)return pe("内置厂家参数不可直接改写；可新增自定义型号");let e=t||{id:"USR-"+crypto.randomUUID(),brand:"",name:"",sku:"",kind:"gateway",poles:2,amps:null,width:54,height:94,depth:59,minWire:1,maxWire:16,neutralSide:"left",protectedPoles:0,residual:30,rcdType:"A",icn:null,backup:40,voltage:"",sourceURL:"",protocol:["din"],channels:null,smart:!0,powerInput:"unknown",loadPowerInput:"unknown"},r=kt.nodes.filter(s=>s.product.id===e.id).length,tplActive=DIN_SIZE_TEMPLATES.find(s=>Math.abs(s.width-e.width)<.2&&Math.abs(s.height-e.height)<1&&Math.abs(s.depth-e.depth)<1)?.id||"";
 MA(t?"编辑器件库型号":"新增品牌与型号",`
     <p>先点选精绘 DIN 尺寸模板，再填写品牌与型号；保存后自动生成可上架三维的模块。当前关联 ${r} 个装配实例。用户录入 · 电气额定未核验。</p>
     <div class="din-templates" id="lib-templates">${DIN_SIZE_TEMPLATES.map(s=>`<button type="button" class="din-chip${s.id===tplActive?" active":""}" data-tpl="${s.id}" title="${it(s.hint)}"><strong>${it(s.label)}</strong><small>${it(s.hint)}</small></button>`).join("")}</div>
@@ -540,12 +747,13 @@ MA(t?"编辑器件库型号":"新增品牌与型号",`
     <div class="field-grid" id="lib-smart-fields">${Bt("协议（智能模块，逗号分隔）",`<input id="lib-protocol" value="${it(Array.isArray(e.protocol)?e.protocol.join(", "):e.protocol||"din")}" maxlength="120" placeholder="din, knx, dali">`)}
       ${Bt("通道数（可选）",TA("lib-channels",e.channels,"路",0,64,1))}</div>
     ${Bt("适用电压 / 频率（未填待核）",`<input id="lib-voltage" value="${it(e.voltage||"")}" maxlength="100">`)}
-    ${Bt("厂家资料链接（可留空）",`<input id="lib-source" value="${it(e.sourceURL||"")}" maxlength="1000" placeholder="https://">`)}
+    ${customElectricalFields(e,Bt,it)}
+    ${Bt("厂家资料链接（可留空）",`<input id="lib-source" value="${it(e.sourceURL||e.source?.url||"")}" maxlength="1000" placeholder="https://">`)}
     <p class="lib-preview" id="lib-preview"></p>
     <button class="btn primary" id="lib-save">保存到器件库</button>`);
-function syncKindUI(){let s=R("#lib-kind").value,n=isSmartCustomKind(s);R("#lib-amps").disabled=s==="spd"||n,["rccb","spd"].includes(s)?R("#lib-protected").value=0:n?R("#lib-protected").value=0:+R("#lib-protected").value==0&&s!=="rccb"&&s!=="spd"&&(R("#lib-protected").value=1),R("#lib-rcd-fields").style.opacity=["rcbo","rccb"].includes(s)?"1":".45",R("#lib-smart-fields").style.opacity=n?"1":".45",updatePreview()}
+function syncKindUI(){let s=R("#lib-kind").value,n=isSmartCustomKind(s);R("#lib-psu-fields").hidden=s!=="psu";R("#lib-amps").disabled=s==="spd"||n,["rccb","spd"].includes(s)?R("#lib-protected").value=0:n?R("#lib-protected").value=0:+R("#lib-protected").value==0&&s!=="rccb"&&s!=="spd"&&(R("#lib-protected").value=1),R("#lib-rcd-fields").style.opacity=["rcbo","rccb"].includes(s)?"1":".45",R("#lib-smart-fields").style.opacity=n?"1":".45",updatePreview()}
 function updatePreview(){let s=R("#lib-brand").value.trim(),n=R("#lib-sku").value.trim(),o=R("#lib-name"),i=autoCustomName(s,n,o.value);(!o.dataset.touched||!o.value.trim())&&s&&n&&(o.value=i);let l=R("#lib-width").valueAsNumber,d=R("#lib-height").valueAsNumber,f=R("#lib-depth").valueAsNumber,u=Number.isFinite(l)?Math.ceil(l/18):"—";R("#lib-preview").textContent=`预览：${o.value||"(待填名称)"} · ${R("#lib-kind").value} · ${Number.isFinite(l)?l:"?"}×${Number.isFinite(d)?d:"?"}×${Number.isFinite(f)?f:"?"} mm · ${u}M · 精绘面板自动生成`}
-R("#lib-name").oninput=()=>{R("#lib-name").dataset.touched="1",updatePreview()},R("#lib-brand").oninput=updatePreview,R("#lib-sku").oninput=updatePreview,["lib-width","lib-height","lib-depth"].forEach(s=>R("#"+s).addEventListener("input",updatePreview)),R("#lib-kind").onchange=syncKindUI,R("#lib-templates").onclick=s=>{let n=s.target.closest("[data-tpl]");if(!n)return;let o=DIN_SIZE_TEMPLATES.find(i=>i.id===n.dataset.tpl);if(!o)return;R("#lib-width").value=o.width,R("#lib-height").value=o.height,R("#lib-depth").value=o.depth,R("#lib-templates").querySelectorAll(".din-chip").forEach(i=>i.classList.toggle("active",i.dataset.tpl===o.id)),updatePreview()},syncKindUI(),R("#lib-save").onclick=()=>{try{let s=isSmartCustomKind(R("#lib-kind").value),n={...e,brand:R("#lib-brand").value,name:R("#lib-name").value||autoCustomName(R("#lib-brand").value,R("#lib-sku").value),sku:R("#lib-sku").value,kind:R("#lib-kind").value,poles:+R("#lib-poles").value,amps:R("#lib-amps").value===""||!Number.isFinite(R("#lib-amps").valueAsNumber)?null:R("#lib-amps").valueAsNumber,protectedPoles:R("#lib-protected").valueAsNumber||0,width:R("#lib-width").valueAsNumber,height:R("#lib-height").valueAsNumber,depth:R("#lib-depth").valueAsNumber,minWire:R("#lib-min").valueAsNumber,maxWire:R("#lib-max").valueAsNumber,neutralSide:R("#lib-neutral").value,residual:+R("#lib-residual").value,rcdType:R("#lib-type").value,icn:R("#lib-icn").value===""?null:R("#lib-icn").valueAsNumber,backup:+R("#lib-backup").value,voltage:R("#lib-voltage").value,sourceURL:R("#lib-source").value.trim(),protocol:R("#lib-protocol").value,channels:R("#lib-channels").value===""?null:R("#lib-channels").valueAsNumber,smart:s},o=Co(n),i=ea(Y);i.customProducts=i.customProducts.filter(l=>l.id!==e.id),i.customProducts.push(o),i.mainProductId===e.id&&Number.isFinite(o.amps)&&(i.mainAmps=o.amps),i.disconnected=[],i.wireOverrides={};let l=_s(i);$s(l),R("#modal").close(),de(d=>Object.assign(d,l),!0),pr="library",UA(),pe("器件库已保存，关联实例已更新 · 三维将使用精绘面板")}catch(s){pe(s.message)}}}
+R("#lib-name").oninput=()=>{R("#lib-name").dataset.touched="1",updatePreview()},R("#lib-brand").oninput=updatePreview,R("#lib-sku").oninput=updatePreview,["lib-width","lib-height","lib-depth"].forEach(s=>R("#"+s).addEventListener("input",updatePreview)),R("#lib-kind").onchange=syncKindUI,R("#lib-templates").onclick=s=>{let n=s.target.closest("[data-tpl]");if(!n)return;let o=DIN_SIZE_TEMPLATES.find(i=>i.id===n.dataset.tpl);if(!o)return;R("#lib-width").value=o.width,R("#lib-height").value=o.height,R("#lib-depth").value=o.depth,R("#lib-templates").querySelectorAll(".din-chip").forEach(i=>i.classList.toggle("active",i.dataset.tpl===o.id)),updatePreview()},syncKindUI(),R("#lib-save").onclick=()=>{try{let s=isSmartCustomKind(R("#lib-kind").value),n={...e,...readCustomElectrical(R("#modal"),R("#lib-kind").value),brand:R("#lib-brand").value,name:R("#lib-name").value||autoCustomName(R("#lib-brand").value,R("#lib-sku").value),sku:R("#lib-sku").value,kind:R("#lib-kind").value,poles:+R("#lib-poles").value,amps:R("#lib-amps").value===""||!Number.isFinite(R("#lib-amps").valueAsNumber)?null:R("#lib-amps").valueAsNumber,protectedPoles:R("#lib-protected").valueAsNumber||0,width:R("#lib-width").valueAsNumber,height:R("#lib-height").valueAsNumber,depth:R("#lib-depth").valueAsNumber,minWire:R("#lib-min").valueAsNumber,maxWire:R("#lib-max").valueAsNumber,neutralSide:R("#lib-neutral").value,residual:+R("#lib-residual").value,rcdType:R("#lib-type").value,icn:R("#lib-icn").value===""?null:R("#lib-icn").valueAsNumber,backup:+R("#lib-backup").value,voltage:R("#lib-voltage").value,sourceURL:R("#lib-source").value.trim(),protocol:R("#lib-protocol").value,channels:R("#lib-channels").value===""?null:R("#lib-channels").valueAsNumber,smart:s},o=Co(n),i=ea(Y);i.customProducts=i.customProducts.filter(l=>l.id!==e.id),i.customProducts.push(o),i.mainProductId===e.id&&Number.isFinite(o.amps)&&(i.mainAmps=o.amps),i.disconnected=[],i.wireOverrides={};let l=_s(i);$s(l),R("#modal").close(),de(d=>Object.assign(d,l),!0),pr="library",UA(),pe("器件库已保存，关联实例已更新 · 三维将使用精绘面板")}catch(s){pe(s.message)}}}
 function PX(a){let t=Me(Y,a);if(!t)return;let e=es();if(t.kind==="rccb"){let r=Y.circuits.filter(s=>kA(Y,s).product.kind==="mcb"&&t.poles===(s.voltage===380?4:2));if(!r.length)return pe("\u6CA1\u6709\u53EF\u5173\u8054\u7684 MCB \u56DE\u8DEF\uFF1BRCBO \u5DF2\u81EA\u5E26\u6F0F\u4FDD\uFF0C\u4E0D\u91CD\u590D\u4E32\u8054");MA("\u88C5\u5165\u5173\u8054\u6F0F\u4FDD",`<p>${it(t.brand)} \xB7 ${it(t.name)}</p>${Bt("\u5173\u8054\u56DE\u8DEF",`<select id="install-circuit">${re(r.map(s=>[s.id,s.id+" "+s.name]),r.some(s=>s.id===e?.id)?e.id:r[0].id)}</select>`)}<button id="install-save" class="btn primary">\u88C5\u5165 / \u66FF\u6362</button>`),R("#install-save").onclick=()=>{let s=R("#install-circuit").value;R("#modal").close(),de(n=>n.circuits.find(o=>o.id===s).rcdProductId=t.id,!0),VA(s+"-RCD")};return}if(t.kind==="spd"){if(t.poles!==(Y.supply==="three"?4:2))return pe("SPD \u6781\u6570\u4E0E\u5F53\u524D\u4F9B\u7535\u76F8\u5236\u4E0D\u7B26");MA("\u88C5\u5165\u6D6A\u6D8C\u4FDD\u62A4\u7EC4\u5408",`<p>${it(t.name)}\uFF0C\u914D\u5957\u540E\u5907 ${t.backup}A\u3002${t.custom?"\u7528\u6237\u53C2\u6570\u548C\u540E\u5907\u7EC4\u5408\u9700\u6838\u5382\u5BB6\u8D44\u6599\u3002":"\u4F9D\u636E\u5BF9\u5E94\u578B\u53F7\u6570\u636E\u8868\u3002"}</p><button id="install-save" class="btn primary">\u88C5\u5165 / \u66FF\u6362 SPD</button>`),R("#install-save").onclick=()=>{R("#modal").close(),de(r=>{r.includeSpd=!0,r.spdProductId=t.id},!0),VA("SPD")};return}if(isSmartModuleKind(t)||isSharedModuleKind(t.kind)){openModuleDialog(t,null);return}openInstallDialog(t,e);}
 
 function ensureModuleArrays(design){
@@ -566,20 +774,32 @@ function terminalOptions(preferConductor){
     return [m.id,`${m.id} · ${tone} · ${m.label||p?.name||""}`];
   })];
 }
-function channelAssignHtml(product, channels, channelLabels, channelTerminals){
+function channelAssignHtml(product, channels, channelLabels, channelTerminals, independentCircuits){
   const n=Math.max(0, Number(product.channels)||0);
   if(!n) return '<p class="lib-preview">该型号无通道（网关/电源等），仅装入模块本体。</p>';
   if(product.kind==="terminal"){
     return `<p class="lib-preview">${product.terminalColor==="blue"?"蓝色零线端子：灯/负载 N 先上本端子，再接到 N 排或模块。":"灰色相线端子：灯线 L 先上本端子，再跳到继电器通道。"}共 ${n} 极。</p>`;
   }
-  const simple=isSimpleMode(Y);
-  const opts=[["","— 未分配 —"],...Y.circuits.map(c=>[c.id,c.id+" "+c.name])];
+  const simple=isSimpleMode(Y)&&!loadTopology(product)&&!hasDryContacts(product);
+  const selectable=loadTopology(product)||hasDryContacts(product)?Y.circuits.filter(c=>c.voltage===(loadTopology(product)==='threePhase'?380:220)):Y.circuits;
+  const opts=[["","— 未分配 —"],...(independentCircuits||selectable).map(c=>[
+    c.id, c.id+" "+c.name+(independentCircuits?` · ${Y.supply==='single'?'L1':c.phase} / 220 V`:'')
+  ])];
   const termOpts=terminalOptions("L");
   return `<div class="channel-label-grid">${Array.from({length:n},(_,i)=>{
     const ch=i+1;
     const cur=channels?.[ch]||channels?.[String(ch)]||"";
     const lab=channelLabels?.[ch]||channelLabels?.[String(ch)]||"";
     const term=channelTerminals?.[ch]||channelTerminals?.[String(ch)]||"";
+    if(independentCircuits){
+      const unavailable=cur&&!independentCircuits.some(c=>c.id===cur)
+        ? `<option value="${it(cur)}" selected disabled data-unavailable>${it(cur)} · 请重新分配</option>` : '';
+      return `<div class="field-grid" data-bridge-row>
+        ${Bt(`CH${ch} 馈电回路`,`<select data-bridge-ch="${ch}" aria-describedby="mod-bridge-note">${re(opts,cur)}${unavailable}</select>`)}
+        <p class="condition" data-bridge-state hidden></p>
+        ${Bt(`CH${ch} 负载备注`,`<input data-mod-label="${ch}" maxlength="80" value="${it(lab)}" placeholder="选填">`)}
+      </div>`;
+    }
     if(simple){
       return Bt("CH"+ch+" 接什么",`<input data-mod-label="${ch}" maxlength="80" value="${it(lab)}" placeholder="例：客厅灯 / 阳台窗帘">
         <select data-mod-term="${ch}" style="margin-top:4px">${re(termOpts,term)}</select>`);
@@ -591,14 +811,28 @@ function breakerOptions(moduleId){
   const bindings=resolveModuleFeedBindings(kt,Y);
   const current=bindings.find(b=>b.moduleId===moduleId);
   const used=new Set(bindings.filter(b=>b.moduleId!==moduleId).map(b=>b.breakerId));
+  const mod=Y.modules.find(m=>m.id===moduleId);
+  const specific=mod && qsReceiver(Me(Y,mod.productId));
+  if(specific){
+    for(const m of Y.modules)for(const c of Object.values(m.channels||{}))if(c)used.add(c);
+    return [['','选择独立市电保护支路'],...(kt?.nodes||[]).filter(n=>n.role==='branch' && n.circuit?.voltage===220 && !used.has(n.id)).map(n=>[n.id,n.id+' · '+n.label])];
+  }
   const nodes=(kt?.nodes||[]).filter(n=>n.role==='branch'&&!used.has(n.id));
   return [['',current?`自动对应 · ${current.breakerId}`:'自动按安装顺序对应'],...nodes.map(n=>[n.id,`${n.id} · ${n.label||n.product?.name||''}`])];
 }
 function openModuleDialog(product, existing){
   ensureModuleArrays(Y);
   const editing=!!existing;
-  const simple=isSimpleMode(Y);
+  const simple=isSimpleMode(Y)&&!loadTopology(product)&&!hasDryContacts(product);
+  const independentFeeds=hasIndependentLoadFeeds(product);
+  const daliGateway=isDinDali2(product);
+  const abbDali=abbDaliLines(product)>0;
+  const fieldLines=daliFieldLineCount(product);
+  const crestronDali=fieldLines>0&&product.id.startsWith('crestron-');
   const id=existing?.id||nextModuleId(Y, product.kind);
+  const independentCircuits=independentFeeds?Y.circuits.filter(c=>c.voltage===220):null;
+  const claimedCircuits=independentFeeds?new Set(Y.modules.filter(m=>m.id!==id)
+    .flatMap(m=>[...Object.values(m.channels||{}),m.protectId,m.feedCircuitId]).filter(Boolean)):null;
   let channels=emptyChannels(product.channels||0, existing?.channels||null);
   let channelLabels=emptyChannelLabels(product.channels||0, existing?.channelLabels||null);
   let channelTerminals={};
@@ -606,18 +840,32 @@ function openModuleDialog(product, existing){
     channelTerminals[i]=existing?.channelTerminals?.[i]||existing?.channelTerminals?.[String(i)]||null;
   }
   let feed=existing?.feed||(product.powerInput==="bus"||product.kind==="psu"||product.kind==="gateway"||product.kind==="terminal"?"none":"shared");
-  let busId=existing?.busId||null;
-  let feedCircuitId=existing?.feedCircuitId||null;
+  let busId=Y.buses.some(bus=>isCresnetDataBus(bus)&&bus.id===existing?.busId)?null:existing?.busId||null;
+  let feedCircuitId=existing?.feedCircuitId||(loadTopology(product)==='commonMotor'?existing?.protectId:null)||null;
   let protectId=existing?.protectId||null;
   let label=existing?.label||id+" "+(product.name||"");
   const slots=freeSlots(product, existing?.id||null);
   const positionKind=product.kind==='terminal'?'terminal':'module';
   const posKey=existing?.position?existing.position.row+"_"+existing.position.slot:(Y.positions?.[id]?Y.positions[id].row+"_"+Y.positions[id].slot:editing?'auto':readInstallPosition(positionKind,slots));
-  const busOpts=[["","不挂总线"],...Y.buses.map(b=>[b.id,b.label+" ("+b.type+")"]),["__new__","＋ 新建总线…"]];
-  const feedOpts=[["shared","共用馈电（模块总进线）"],["perChannel","每路馈电"],["none","无强电馈电（总线/自取电）"]];
+  const chainMember=Y.buses.some(bus=>isCresnetChainBus(bus)&&bus.deviceModuleIds?.includes(id));
+  const ordinaryBuses=Y.buses.filter(bus=>!isCresnetDataBus(bus)&&(!chainMember||bus.id===busId)
+    &&(!abbDali || bus.type==='knx' || bus.id===busId)
+    &&(!crestronDali||['dc','cresnet'].includes(bus.type)||bus.id===busId));
+  const busOpts=[["","不挂总线"],...ordinaryBuses.map(b=>[b.id,b.label+" ("+b.type+")"]),
+    ...(chainMember||fieldLines?[]:[["__new__","＋ 新建总线…"]])];
+  const topology=loadTopology(product);
+  if((topology||hasDryContacts(product))&&(!existing?.feed||existing.feed==='none')) feed=['common','commonMotor'].includes(topology)?'shared':'perChannel';
+  const feedOpts=['common','commonMotor'].includes(topology)?[["shared","共用市电输入 L/N/PE"]]:topology==='threePhase'||(!topology&&hasDryContacts(product))?[["perChannel","每路馈电"]]:['relay','analog','motor'].includes(topology)?[["perChannel","各触点独立取电"],["shared","各触点取自同一保护支路"]]:[["shared","共用馈电（模块总进线）"],["perChannel","每路馈电"],["none","无强电馈电（总线/自取电）"]];
   const circuitOpts=[["","— 未指定 —"],...Y.circuits.map(c=>[c.id,c.id+" "+c.name])];
   const isTerm=product.kind==="terminal";
   const hasPsuOutputs=!!psuConnectionType(product);
+  const savedBridgeMode=existing?.bridgeMode===undefined?'0000':existing.bridgeMode;
+  const validBridgeMode=DIMMER_BRIDGE_MODES.includes(savedBridgeMode);
+  const bridgeOptions=DIMMER_BRIDGE_MODES.map(mode=>{
+    const needsJumperReview=dimmerOutputGroups(mode).some(group=>!dimmerGroupUsesIncludedJumpers(group));
+    return [mode,`${dimmerBridgeLabel(mode)}（${mode}）${needsJumperReview?' · 跨接件待核':''}`];
+  });
+  if(!validBridgeMode) bridgeOptions.unshift(['','已保存的模式待重新选择']);
   MA(editing?"编辑模块 "+id:product.outletCount?"装入PDU":isTerm?"装入菲尼克斯端子":product.networkPorts?(product.poe?"装入PoE网关":"装入交换机"):"装入智能模块",`
     <p>${it(product.brand)} · ${it(product.name)} · ${product.channels?product.channels+" 路 · ":""}${product.width!=null?product.width+" mm / "+product.modules+" M":"宽度待核"}</p>
     ${modulePowerDescription(product)?`<p class="condition" id="mod-power-description">${it(modulePowerDescription(product))}</p>`:''}
@@ -627,26 +875,87 @@ function openModuleDialog(product, existing){
     ${Bt('地址类型',`<select id="mod-address-mode">${re([['none','无'],['id','模块 ID'],['ip','IP 地址'],['both','ID + IP']],moduleAddressMode(existing||{}))}</select>`)}
     <div id="mod-id-field">${Bt('模块 ID（十六进制）',`<input id="mod-hardware-id" maxlength="2" placeholder="01 / 0E" aria-describedby="mod-id-error" value="${it(existing?.hardwareId||'')}">`)}<p id="mod-id-error" role="alert" style="color:#bf3030" hidden></p></div>
     <div id="mod-ip-field">${Bt('IP 地址',`<input id="mod-ip-address" maxlength="45" placeholder="192.168.1.100" value="${it(existing?.ipAddress||'')}">`)}</div>
-    ${!isMainsFedModule(product)||product.networkPorts||product.outletCount?"":Bt(product.loadPowerInput==='LN'?"灯具／设备负载的支路空开":"对应支路空开（一对一）",`<select id="mod-protect">${re(breakerOptions(id),protectId||"")}</select>`)}
-    <div style="${hasPsuOutputs||product.networkPorts||product.outletCount?"display:none":""}" class="${simple||isTerm?"full-only":""}">
+    ${independentFeeds||topology||!isMainsFedModule(product)||product.networkPorts||product.outletCount?"":Bt(qsReceiver(product)?"本机市电 L/N/PE 保护支路":product.loadPowerInput==='LN'?"灯具／设备负载的支路空开":"对应支路空开（一对一）",`<select id="mod-protect">${re(breakerOptions(id),protectId||"")}</select>`)}
+    <div style="${hasPsuOutputs||product.networkPorts||product.outletCount?"display:none":""}" class="${(simple&&!independentFeeds)||isTerm?"full-only":""}">
       <div class="field-grid">
-        ${Bt("总线",`<select id="mod-bus">${re(busOpts,busId||"")}</select>`)}
-        ${Bt(product.loadPowerInput==="LN"?"灯具／设备负载馈电方式":"馈电方式",`<select id="mod-feed">${re(feedOpts,feed)}</select>`)}
+        ${Bt(abbDali?"KNX 总线":independentFeeds||fieldLines?"控制侧总线":"总线",`<select id="mod-bus">${re(busOpts,busId||"")}</select>`)}
+        ${independentFeeds||fieldLines?"":Bt(product.loadPowerInput==="LN"?"灯具／设备负载馈电方式":"馈电方式",`<select id="mod-feed">${re(feedOpts,feed)}</select>`)}
       </div>
-      ${Bt("取电回路（共用馈电时）",`<select id="mod-feed-c">${re(circuitOpts,feedCircuitId||"")}</select>`)}
+      ${independentFeeds||fieldLines?"":Bt("取电回路（共用馈电时）",`<select id="mod-feed-c">${re(circuitOpts,feedCircuitId||"")}</select>`)}
     </div>
-    <div id="mod-channels">${channelAssignHtml(product, channels, channelLabels, channelTerminals)}</div>
+    ${chainMember?'<p class="condition">该调光器的 24V 控制电源由 DIN-PWS50 串接总线分配。</p>':''}
+    ${independentFeeds?Bt('输出桥接模式',`<select id="mod-bridge-mode" aria-describedby="mod-bridge-note">${re(bridgeOptions,validBridgeMode?savedBridgeMode:'')}</select>`):''}
+    ${independentFeeds?'<p id="mod-bridge-note" class="condition" aria-live="polite"></p>':''}
+    ${daliGateway?daliPowerFields(existing||{}):''}
+    ${product.id==='tridonic-dali-ps2'?Bt('现场确认的 DALI 正极（正视下方 DA / DA）',`<select id="mod-dali-positive-side">${re([['','极性待核'],['left','左 DA'],['right','右 DA']],existing?.daliPositiveSide||'')}</select>`):''}
+    ${qsFields(Y,existing||{id,productId:product.id},pid=>Me(Y,pid))}
+    ${serialFields(Y,{...existing,id,productId:product.id})}
+    ${verifiedLoadFields(Y,existing||{},product,pid=>Me(Y,pid))}
+    ${daliFieldInputs(Y,existing||{},product,pid=>Me(Y,pid))}
+    <div id="mod-channels">${daliFieldLineCount(product)?Array.from({length:daliFieldLineCount(product)},(_,i)=>i+1).map(loop=>Bt(`DALI ${loop} 回路备注`,`<input data-mod-label="${loop}" maxlength="80" value="${it(channelLabels[loop]||'')}" placeholder="选填">`)).join(''):channelAssignHtml(product, channels, channelLabels, channelTerminals, independentCircuits)}</div>
+    ${independentFeeds?'<p class="lib-preview">保存后可在「端子接线」中将调光输出接到指定灰色端子。</p>':''}
     ${psuConnectionFields(Y,id,product,pid=>Me(Y,pid),it)}
     ${networkSwitchFields(product,existing||{id})}
     ${pduFields(product,existing||{id})}
     ${Bt("安装位置",`<select id="mod-pos">${re([["auto","自动顺延"],...slots.map(r=>[r.row+"_"+r.slot,positionLabel(r)])],posKey)}</select>`)}
-    <p class="lib-preview">${product.outletCount?"PDU用支架固定，模位为安装占位；所接设备文字用于标识，不生成未经核实的电气连线。":product.networkPorts?(product.powerInput==="ac-inlet"?"网络端口不生成 PoE 或市电接线；本机为内置交流电源，请预留后部电源线及接地空间。":(product.poe?"本机支持PoE供电；当前模型显示接口与备注，不模拟PoE链路。另行预留54V DC / 2.4A外置适配器空间。":"网络端口不生成 PoE 或市电接线；请另行预留外置 5V DC / 1A 适配器空间。")):isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":!isMainsFedModule(product)?"模块控制电源请在对应直流电源的下端出线中选择；总线接口用于通信。":simple?"支路空开对应模块的负载侧，向灯具／设备供电；模块本身的直流供电另行选择。总空开不参与分配。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
+    <p class="lib-preview">${product.outletCount?"PDU用支架固定，模位为安装占位；所接设备文字用于标识，不生成未经核实的电气连线。":product.networkPorts?(product.powerInput==="ac-inlet"?"网络端口不生成 PoE 或市电接线；本机为内置交流电源，请预留后部电源线及接地空间。":(product.poe?"本机支持PoE供电；当前模型显示接口与备注，不模拟PoE链路。另行预留54V DC / 2.4A外置适配器空间。":"网络端口不生成 PoE 或市电接线；请另行预留外置 5V DC / 1A 适配器空间。")):isTerm?"灯线先压到端子 FIELD 侧，PANEL 侧跳到继电器。零线用蓝色端子。":fieldLines?(abbDali?"交流保护支路给网关本机供电。KNX 和 DALI 出箱端子分别配置。":crestronDali?"NET 24/G 或 PoE 给网关本机供电。DALI 两芯出线在各回路中配置。":"本机 L/N/PE 与 DALI 出箱分别配置，QS Link 在处理器中分配。"):!isMainsFedModule(product)?"模块控制电源请在对应直流电源的下端出线中选择；总线接口用于通信。":simple?"支路空开对应模块的负载侧，向灯具／设备供电；模块本身的直流供电另行选择。总空开不参与分配。":"多路模块只占一个导轨位；可同时备注通道并关联回路。"}</p>
     <p id="mod-save-error" role="alert" style="color:#bf3030" hidden></p>
     <div class="field-grid" style="margin-top:8px">
-      ${simple||isTerm||product.networkPorts||product.outletCount?"":`<button class="btn" type="button" id="mod-suggest-smart">建议创建 C-SMART 取电回路</button>`}
+      ${simple||isTerm||independentFeeds||topology||daliGateway||product.networkPorts||product.outletCount?"":`<button class="btn" type="button" id="mod-suggest-smart">建议创建 C-SMART 取电回路</button>`}
       <button class="btn primary" type="button" id="mod-save">${editing?"保存模块":product.outletCount?"装入PDU":product.networkPorts?(product.poe?"装入PoE网关":"装入交换机"):"装入模块"}</button>
     </div>`);
   const feedEl=R("#mod-feed"), feedC=R("#mod-feed-c");
+  const readQs=bindQsFields(R('#modal-body'));
+  bindAnalogCurrent(R('#modal-body'),product);
+  const readDali=daliGateway?bindDaliPowerFields(R('#modal-body'),Y,existing||{id,productId:product.id},product,pid=>Me(Y,pid)):null;
+  const readDaliFields=bindDaliFieldInputs(R('#modal-body'),Y,existing||{},product,pid=>Me(Y,pid));
+  const bridgeModeField=R('#mod-bridge-mode');
+  const channelSelects=[...R("#mod-channels").querySelectorAll(independentFeeds?"[data-bridge-ch]":"[data-mod-ch]")];
+  if(independentFeeds){
+    const updateOptions=()=>{
+      const selected=new Set(channelSelects.filter(select=>!select.disabled).map(select=>select.value));
+      for(const select of channelSelects){
+        for(const option of select.options){
+          if(option.value&&!option.hasAttribute("data-unavailable")){
+            option.disabled=claimedCircuits.has(option.value)||(option.value!==select.value&&selected.has(option.value));
+          }
+        }
+      }
+    };
+    const updateBridgeMode=()=>{
+      const groups=dimmerOutputGroups(bridgeModeField.value);
+      const byChannel=new Map((groups||[]).flatMap(group=>group.map(channel=>[channel,group])));
+      for(const select of channelSelects){
+        const channel=Number(select.dataset.bridgeCh);
+        const group=byChannel.get(channel);
+        const lead=group?.[0]===channel;
+        const label=select.closest('label');
+        const state=select.closest('[data-bridge-row]').querySelector('[data-bridge-state]');
+        label.hidden=!lead;
+        select.disabled=!lead;
+        state.hidden=lead;
+        if(lead){
+          select.dataset.modCh=String(channel);
+          label.querySelector('span').textContent=`${group.map(ch=>`CH${ch}`).join('+')} 馈电回路`;
+        }else{
+          delete select.dataset.modCh;
+          const circuit=select.value?`。保存后解除 CH${channel} 原独立回路 ${select.value}`:'';
+          state.textContent=group?`CH${channel} 跟随组首 CH${group[0]}${circuit}`:`CH${channel} 待选桥接模式`;
+        }
+      }
+      const needsJumperReview=groups?.filter(group=>!dimmerGroupUsesIncludedJumpers(group))||[];
+      const reviewText=needsJumperReview.map(group=>group.map(channel=>`CH${channel}`).join('+')).join(' / ');
+      let guide='每个桥接组由组首选择一路 220V 单相回路，灰色出线端子也关联组首。实物的桥接设置和出厂 L/N 共接跳线须与分组一致。';
+      if(!groups) guide='请选择厂家支持的输出桥接模式。';
+      else if(bridgeModeField.value==='0000') guide='各通道分别选择独立回路。独立馈电须移除出厂 L/N 共接跳线。';
+      else if(reviewText) guide=`${reviewText} 跨接件待核。厂家随附跳线适用于相邻通道，此组按草案保存。其他通道按所选回路接线。`;
+      R('#mod-bridge-note').textContent=guide;
+      updateOptions();
+    };
+    for(const select of channelSelects) select.addEventListener("change",updateOptions);
+    bridgeModeField.addEventListener('change',updateBridgeMode);
+    updateBridgeMode();
+  }
   rememberInstallPosition(R('#mod-pos'),positionKind);
   const validateDialogId=()=>{
     const input=R('#mod-hardware-id'), error=R('#mod-id-error');
@@ -673,6 +982,13 @@ function openModuleDialog(product, existing){
     if(ev.target.value!=="__new__") return;
     const type=inferBusType(product.protocol||[]);
     const nid=nextBusId(Y,type);
+    if(independentFeeds){
+      const bus=busDefaults(type,nid);
+      de(d=>d.buses.push(bus));
+      ev.target.add(new Option(`${bus.label} (${type})`,nid),ev.target.options.length-1);
+      ev.target.value=nid;
+      return;
+    }
     de(d=>{ensureModuleArrays(d); d.buses.push(busDefaults(type,nid))},true);
     openModuleDialog(product, existing||{id,label,busId:nid,feed,feedCircuitId,channels,channelLabels,protectId,position:null});
   });
@@ -691,21 +1007,45 @@ function openModuleDialog(product, existing){
     if(!validateDialogId()){R('#mod-hardware-id').focus();return;}
     const nextLabel=R("#mod-label").value.trim()||id;
     let nextBus=R("#mod-bus")?.value||""; if(nextBus==="__new__") return pe("请先完成总线创建");
-    const nextFeed=R("#mod-feed")?.value||"none";
+    const nextFeed=independentFeeds?"perChannel":R("#mod-feed")?.value||"none";
     const nextFeedC=R("#mod-feed-c")?.value||null;
-    const nextProtect=R("#mod-protect")?.value||null;
+    const nextProtect=topology==='commonMotor'?nextFeedC:R("#mod-protect")?.value||null;
     const nextCh={};
     const nextLabs={};
-    const nextTerms={};
-    document.querySelectorAll("[data-mod-ch]").forEach(el=>{ nextCh[+el.dataset.modCh]=el.value||null; });
+    const nextTerms=independentFeeds||daliFieldLineCount(product)?{...channelTerminals}:{};
+    channelSelects.filter(el=>el.hasAttribute('data-mod-ch')).forEach(el=>{ nextCh[+el.dataset.modCh]=el.value||null; });
     document.querySelectorAll("[data-mod-label]").forEach(el=>{ nextLabs[+el.dataset.modLabel]=el.value.trim(); });
     document.querySelectorAll("[data-mod-term]").forEach(el=>{ nextTerms[+el.dataset.modTerm]=el.value||null; });
     const posRaw=R("#mod-pos").value;
     const pos=posRaw==="auto"?null:{row:+posRaw.split("_")[0],slot:+posRaw.split("_")[1]};
     try{
+      for(const terminal of new Set(Object.values(nextTerms).filter(Boolean))) ensureLoadTerminalFree(Y,terminal);
+      if(independentFeeds){
+        const groups=dimmerOutputGroups(bridgeModeField.value);
+        if(!groups) throw new Error('请选择厂家支持的输出桥接模式。');
+        const followerOutputs=new Set(groups.flatMap(group=>group.slice(1).map(channel=>`${id}:CH${channel}_OUT`)));
+        const followerTerminal=followerOutputs.size && terminalRows(Y,pid=>Me(Y,pid)).find(row=>followerOutputs.has(row.output));
+        if(followerTerminal){
+          throw new Error(`请先在「端子接线」解除 ${followerTerminal.terminalId}:${followerTerminal.pole} 与 ${followerTerminal.output} 的连线。`);
+        }
+        const selected=new Set();
+        for(const [channel,circuitId] of Object.entries(nextCh)){
+          if(!circuitId) continue;
+          if(!independentCircuits.some(c=>c.id===circuitId)) throw new Error(`CH${channel} 请选择 220 V 回路。`);
+          if(claimedCircuits.has(circuitId)) throw new Error(`回路 ${circuitId} 已关联到其他模块。`);
+          if(selected.has(circuitId)) throw new Error(`回路 ${circuitId} 在同一模块中只能分配给一个通道。`);
+          selected.add(circuitId);
+        }
+      }
+      verifyLoadCircuitSelection(Y,product,nextCh,nextFeed,nextFeedC||nextProtect);
       const addressMode=R('#mod-address-mode').value;
       const hardwareId=['id','both'].includes(addressMode)?validateHardwareId(Y,id,R('#mod-hardware-id').value):R('#mod-hardware-id').value;
       const mod=normalizeModule({
+        ...readSerialFields(R('#modal-body'),Y,{...existing,id,productId:product.id}),
+        ...(readQs?{qsConfig:readQs()}:{}),
+        ...readVerifiedLoadFields(R('#modal-body'),Y,id,product,nextCh),
+        ...(readDaliFields?{daliFieldLoops:readDaliFields()}:{}),
+        ...(product.id==='tridonic-dali-ps2'?{daliPositiveSide:R('#mod-dali-positive-side').value}:{}),
         ...(product.networkPorts?readNetworkSwitchFields(R('#modal-body'),product):{}),
         ...(product.outletCount?readPduFields(R('#modal-body'),product):{}),
         displayName:R('#mod-display-name').value,
@@ -713,16 +1053,30 @@ function openModuleDialog(product, existing){
         ipAddress: ['ip','both'].includes(addressMode)?validateIpAddress(R('#mod-ip-address').value):R('#mod-ip-address').value,
         hardwareId,
         terminalConnections: existing?.terminalConnections,
+        ...(independentFeeds?{bridgeMode:bridgeModeField.value}:{}),
         id, productId:product.id, label:nextLabel, busId:product.networkPorts||product.outletCount?null:nextBus||null,
-        feed:simple||isTerm||product.networkPorts||product.outletCount?"none":nextFeed, feedCircuitId:!simple&&!isTerm&&!product.networkPorts&&!product.outletCount&&nextFeed==="shared"?nextFeedC:null,
-        channels:emptyChannels(product.channels||0, simple||isTerm?channels:nextCh),
+        feed:(!independentFeeds&&simple)||isTerm||product.networkPorts||product.outletCount?"none":nextFeed, feedCircuitId:!simple&&!isTerm&&!product.networkPorts&&!product.outletCount&&nextFeed==="shared"?nextFeedC:null,
+        channels:emptyChannels(product.channels||0, (simple&&!independentFeeds)||isTerm||daliFieldLineCount(product)?channels:nextCh),
         channelLabels:emptyChannelLabels(product.channels||0, nextLabs),
         channelTerminals:nextTerms,
-        protectId:isTerm?null:(nextProtect||null),
+        protectId:isTerm?null:(nextProtect||(topology&&!Object.values(nextCh).some(Boolean)?existing?.protectId:null)||null),
         position:pos
       }, product);
       const outputTargets=[...document.querySelectorAll('[data-psu-target]:checked')].map(el=>el.dataset.psuTarget);
-      if(hasPsuOutputs){
+      if(Y.buses.some(b=>b.id===mod.busId&&b.type==='rs485') &&
+        (mod.rs485Meters?.length || Y.modules.some(m=>m.rs485Meters?.includes(id)))) throw new Error('请先解除 DIN-AP4 的 COM1 电表分配。');
+      const qsDraft={...Y,modules:[...Y.modules.filter(m=>m.id!==id),mod]};
+      const ordinary=mod.busId && Y.buses.find(b=>b.id===mod.busId);
+      if(ordinary && qsBusIssue(qsDraft,ordinary))throw new Error(qsBusIssue(qsDraft,ordinary));
+      if(mod.qsConfig)validateQsConfig(qsDraft,mod,pid=>Me(Y,pid));
+      if(qsReceiver(product) && mod.protectId && qsMainsIssue(qsDraft,mod))throw new Error(qsMainsIssue(qsDraft,mod));
+      const updatePsuOutputs=hasPsuOutputs&&!R('#modal-body [data-cresnet-managed], #modal-body [data-dali-managed], #modal-body [data-qs-managed]');
+      if(readDaliFields){
+        const draft={...Y,modules:[...Y.modules.filter(m=>m.id!==id),mod]};
+        if(readDali) saveDaliPower(draft,id,readDali(),pid=>Me(draft,pid));
+        validateDaliFields(draft,mod,product,pid=>Me(draft,pid));
+      }
+      if(updatePsuOutputs){
         const draft=structuredClone(Y);
         const index=draft.modules.findIndex(m=>m.id===id);
         index>=0?draft.modules[index]=mod:draft.modules.push(mod);
@@ -732,28 +1086,28 @@ function openModuleDialog(product, existing){
         ensureModuleArrays(d);
         const i=d.modules.findIndex(m=>m.id===id);
         i>=0?d.modules[i]=mod:d.modules.push(mod);
-        if(hasPsuOutputs) savePsuConnections(d,id,product,outputTargets);
-        else for(const b of d.buses){
-          if(b.id!==existing?.busId||b.id===mod.busId) continue;
+        if(updatePsuOutputs) savePsuConnections(d,id,product,outputTargets);
+        else if(!hasPsuOutputs) for(const b of d.buses){
+          if(isCresnetDataBus(b)||b.id!==existing?.busId||b.id===mod.busId) continue;
           b.psuModuleIds=(b.psuModuleIds||[]).filter(x=>x!==id);
           b.deviceModuleIds=(b.deviceModuleIds||[]).filter(x=>x!==id);
         }
         if(mod.busId&&!hasPsuOutputs){
           let bus=d.buses.find(b=>b.id===mod.busId);
-          if(bus){
+          if(bus&&!isCresnetDataBus(bus)){
             if(product.kind==="psu") bus.psuModuleIds.push(id);
             else if(!bus.deviceModuleIds.includes(id)) bus.deviceModuleIds.push(id);
           }
         }
         writePosition(d, id, pos);
         if(!isTerm){
-          setModuleProtect(d, id, nextProtect||null, null);
-          for(const [ch,tid] of Object.entries(nextTerms)){
+          setModuleProtect(d, id, mod.protectId, null);
+          if(!independentFeeds&&!fieldLines) for(const [ch,tid] of Object.entries(nextTerms)){
             linkChannelTerminal(d, id, +ch, tid||null);
           }
         }
         syncCircuitDevices(d, pid=>Me(d,pid));
-      }, true);
+      }, !independentFeeds&&!fieldLines);
       R("#modal").close();
       VA(id);
       pe(editing?"模块已更新":"模块已装入 · "+id);

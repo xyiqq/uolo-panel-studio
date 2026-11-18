@@ -16,9 +16,9 @@ const lqse12 = dinRail({
     pages: "12 DIN modules · 216 mm",
   },
 });
-const lqse9 = (file, url) => dinRail({
+const lqse9 = (file, url, pages) => dinRail({
   modules: 9, widthMm: 161.7, heightMm: 89.7, depthMm: 60.6,
-  source: { file, url, pages: "Mechanical dimensions" },
+  source: { file, url, pages },
 });
 
 export const LUTRON_PRODUCTS = [
@@ -46,7 +46,9 @@ export const LUTRON_PRODUCTS = [
     channels: 4,
     protocol: ["qslink"],
     powerInput: "LN",
-    ...lqse9("Lutron 369610", "https://assets.lutron.com/a/documents/369610a.pdf"),
+    channelAmps: 10,
+    note: "电子供电使用独立的 L、N、PE。四路开关各有进线与开关输出。各路 0–10 V 可源出或吸收最多 50 mA，四路共负端；所有调光回路的 SELV/PELV 类别须一致。",
+    ...lqse9("Lutron 369610c", "https://assets.lutron.com/a/documents/369610a.pdf","2–8：额定、尺寸、负载、0–10 V 和 QS"),
   }),
   makeSmartProduct({
     id: "lutron-lqse-4s10-d",
@@ -58,7 +60,9 @@ export const LUTRON_PRODUCTS = [
     channels: 4,
     protocol: ["qslink"],
     powerInput: "LN",
-    ...lqse9("Lutron 369610", "https://assets.lutron.com/a/documents/369610a.pdf"),
+    channelAmps: 10,
+    note: "电子供电使用独立的 L、N、PE。四路各接本路进线与开关输出，负载零线与保护地直接由相应支路供给。",
+    ...lqse9("Lutron 369610c", "https://assets.lutron.com/a/documents/369610a.pdf","2–5、8：额定、尺寸、开关输出和 QS"),
   }),
   makeSmartProduct({
     id: "lutron-lqse-2dal-d",
@@ -70,8 +74,9 @@ export const LUTRON_PRODUCTS = [
     protocol: ["dali", "qslink"],
     powerInput: "LN",
     channels: 2,
-    ...lqse9("Lutron 369650", "https://www.lutron.com/TechnicalDocumentLibrary/369650_SPA.pdf"),
-    note: "2 条 DALI 总线，通道数指总线数量，不是 2 路直接灯具输出。",
+    daliPowerSupply: "internal-only",
+    ...lqse9("Lutron 369650g", "https://assets.lutron.com/a/documents/369-650_ENG.pdf","1–6：额定、尺寸、市电输入、DALI 和 QS"),
+    note: "两条 DALI 总线分别内置供电，每路最多 64 个驱动器，保证 128 mA、最大 250 mA。",
   }),
   makeSmartProduct({
     id: "lutron-lqse-4m-d",
@@ -84,7 +89,7 @@ export const LUTRON_PRODUCTS = [
     powerInput: "LN",
     channels: 4,
     channelAmps: 1.5,
-    ...lqse9("Lutron 369614b", "https://assets.lutron.com/a/documents/369614a%20qsmm%20hw.pdf"),
+    ...lqse9("Lutron 369614b", "https://assets.lutron.com/a/documents/369614a%20QSMM%20HW.pdf","2–5：额定、尺寸、市电与电机接线、QS"),
     note: "4 路交流电机控制器（窗帘/百叶），每路最高 1.5 A；不是电表，不适用于照明负载。",
   }),
   makeSmartProduct({
@@ -105,14 +110,14 @@ export const LUTRON_PRODUCTS = [
       depthMm: 60,
       source: { file: "QS 电源常见 DIN 占位（待核具体型号）", url: null, pages: null },
     }),
-    note: "电源外形为导轨占位示意，须按实际 QSPS/配套电源资料替换。",
+    note: "电源外形为历史导轨占位，按实物型号替换。目录另列 QSPS-DH-1-75 和带预装线束的 QSPS-DH-1-75-H。",
   }),
   makeSmartProduct({
     id: "lutron-hqp7",
     brand,
     name: "HQP7",
     sku: "HQP7",
-    availability: "参数待核：处理器系列占位，非 DIN 安装尺寸",
+    availability: "参数待核：处理器系列占位，历史尺寸未核",
     kind: "gateway",
     zone: "control",
     protocol: ["qslink"],
@@ -124,6 +129,42 @@ export const LUTRON_PRODUCTS = [
       depthMm: 70,
       source: { file: "HQP7 QSX 系列（完整型号待补；尺寸未核）", url: "https://assets.lutron.com/a/documents/3691127_ENG.pdf", pages: "QSX Processor" },
     }),
-    note: "HQP7 为系列简称，官方 HQP7-1/-2 采用 24–36 V DC，并非 LN 市电输入；型号未补全，外形仅保留旧占位，不得当作施工尺寸。",
+    note: "HQP7 为系列简称；保留旧 12M 占位，不作为施工尺寸。已核 HQP7-1/-2 为 DIN 导轨安装、24–36VDC 输入，目录另列完整型号；不能自动确定旧方案所用版本。",
   }),
+  makeSmartProduct({
+    id: "lutron-qsps-dh-1-75",
+    brand, name: "QSPS-DH-1-75", sku: "QSPS-DH-1-75",
+    kind: "psu", zone: "control", protocol: ["qslink"],
+    powerInput: "LN", psuOutput: { voltage: 24, amps: 2.5 },
+    availability: "外形与输入/输出额定已按厂家资料核验",
+    ...dinRail({
+      modules: 5, widthMm: 90, heightMm: 90, depthMm: 61,
+      source: { file: "Lutron QS Link Power Supply 369886f (2021-12-01)", url: "https://assets.lutron.com/a/documents/369886_eng.pdf", pages: "1–4：额定、外形、接线和电源分组" },
+    }),
+    note: "100–277VAC、50/60Hz 输入；24VDC±1%、2.5A 输出，最多 75 PDU（不是 75W）。不可用于电动窗帘。上下各留 30mm；同一供电组只用一个电源，不得互连不同电源的正极。此型号不含 -H 后缀，不据此推定 HQP7 配套电源。",
+  }),
+  makeSmartProduct({
+    id: "lutron-qsps-dh-1-75-h",
+    brand, name: "QSPS-DH-1-75-H", sku: "QSPS-DH-1-75-H",
+    kind: "psu", zone: "control", protocol: ["qslink"],
+    powerInput: "LN", psuOutput: { voltage: 24, amps: 2.5 },
+    availability: "机身外形与输入/输出额定已按厂家资料核验",
+    ...dinRail({
+      modules: 5, widthMm: 90, heightMm: 90, depthMm: 61,
+      source: { file: "Lutron HomeWorks QS Power Supply with Wire Harnesses 369885d", url: "https://assets.lutron.com/a/documents/369885_ENG_WEB.pdf", pages: "1–5：型号、额定、外形、安装及线束" },
+    }),
+    note: "100–277VAC、50/60Hz 输入；24VDC±1%、2.5A 输出，最多 75 PDU。两组线束共用电源输出额定，机身尺寸未含线束。上下各留至少 30mm 通风。HQP7-1/-2 的处理器供电与链路供电分别接至厂家指定端子，可在处理器中分别设置处理器线束和现场链路供电。",
+  }),
+  ...[1, 2].map(links => makeSmartProduct({
+    id: `lutron-hqp7-${links}`,
+    brand, name: `HQP7-${links}`, sku: `HQP7-${links}`,
+    kind: "gateway", zone: "control", protocol: ["qslink", "ethernet"],
+    powerInput: "24vdc",
+    availability: "整机控制电源、QS 链路和处理器以太网级联已按厂家资料核验",
+    ...dinRail({
+      modules: 6, widthMm: 108, heightMm: 100, depthMm: 60.5,
+      source: { file: "Lutron HomeWorks QSX Processor 3691127f (2025-08-06)", url: "https://assets.lutron.com/a/documents/3691127_ENG.pdf", pages: "1–2、4–5：型号、额定、外形和供电" },
+    }),
+    note: `${links} 条可配置链路、2 个 RJ45；DIN 安装。含端子高 100mm（机身高 90mm）。处理器输入 24–36VDC / 250mA；目录按 24V 控制侧建模，链路输入另为每路 1A。典型功耗 4.2W（两个网口和两条设备链路使用时），不是最大预算，未填入预算字段。官方配套电源为 QSPS-DH-1-75-H；链路端子为 1 COM、2 +24 V、3 MUX 和 4 MUX̅；各独立电源组只共接 1/3/4。`,
+  })),
 ];

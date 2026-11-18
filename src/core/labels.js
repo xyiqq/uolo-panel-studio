@@ -157,7 +157,9 @@ export function applyLabelRules(design, net) {
   let wireSeq = 0;
   for (const w of net?.wires || []) {
     wireSeq += 1;
-    const tag = w.wireNo || tpl(wireTpl, {
+    const receivingPin = (w.cresnetChain || w.daliLoop || w.qsLink || w.rs485) && wireTpl === DEFAULT_WIRE ? portTags.get(w.to) : '';
+    const standardTag = wireTpl === DEFAULT_WIRE ? [w.circuit, w.conductor].filter(Boolean).join('-') : '';
+    const tag = w.wireNo || receivingPin || standardTag || tpl(wireTpl, {
       id: w.id,
       circuit: w.circuit || "",
       conductor: w.conductor || "",

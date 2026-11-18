@@ -5,6 +5,7 @@
 
 import { productSku, CONDUCTOR_COLORS, matchCircuit } from "./domain.js";
 import {buildDeliveryNet} from './delivery-net.js';
+import {isCresnetDataBus} from './cresnet.js';
 
 const COLOR_NAME = {
   L1: "黄",
@@ -166,6 +167,8 @@ export function buildBom(design, assembly, net) {
 
   // 箱内导线按截面×颜色汇总
   for (const w of net?.wires || []) {
+    if (w.bridgeJumper) continue; // 随模块提供的固定跨接件，不计入散线长度
+    if (w.cresnet || w.rs485) continue; // 一根多芯线按总线行计长。
     // 出箱电缆单独按回路长度估算，不混入箱内
     const isExternal = w.lengthKind === 'external';
     let meters;
@@ -213,15 +216,22 @@ export function buildBom(design, assembly, net) {
   }
 
   // 总线电缆（若 design.buses 存在）
-  for (const b of design?.buses || []) {
-    if (b.cableMeters != null && b.cableMeters > 0) {
+  const serialRuns = (design.modules || []).filter(m=>m.rs485Meters?.length && net.wires.some(w=>w.rs485 && w.serialMaster===m.id))
+    .map(m=>({id:m.id,type:'rs485',serialMaster:m.id,cableMeters:m.rs485MetersLength,cableSpec:'120 Ω 屏蔽双绞线，含信号参考芯'}));
+  for (const b of [...(design.buses || []), ...serialRuns]) {
+    const estimated = (isCresnetDataBus(b) || b.serialMaster) && b.cableMeters == null;
+    const meters = estimated ? net.wires.filter(w => b.serialMaster
+      ? w.serialMaster===b.id && w.conductor==='RS485-A' : w.cresnet && w.busId === b.id && w.conductor === 'Y')
+      .reduce((sum, w) => sum + wireLengthMeters(net, w), 0) : Number(b.cableMeters);
+    if (meters > 0) {
       const key = `bus|${b.type || b.id || "bus"}|${b.section??""}|${b.cableSpec||""}`;
       const previous=wireMap.get(key);
       wireMap.set(key, {
         section: b.section || "总线",
         color: b.type || "总线",
-        meters: (previous?.meters||0)+Number(b.cableMeters),
-        note:'总线电缆手动填写长度'+(b.cableSpec?' · '+b.cableSpec:''),
+        meters: (previous?.meters||0)+meters,
+        ...(estimated || previous?.estimatedBusLength ? {estimatedBusLength:true} : {}),
+        note:(estimated?'整缆按连接端点估算':'总线电缆手动填写长度')+(b.cableSpec?' · '+b.cableSpec:''),
       });
     }
   }

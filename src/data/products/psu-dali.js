@@ -1,5 +1,5 @@
 /**
- * DALI 总线电源。占位按厂家常见 DIN 模位，须以 Spec 复核。
+ * DALI 总线电源与网关。完整型号按厂家资料；系列占位仍须确认版本。
  */
 import { makeSmartProduct } from "./_smart-factory.js";
 import { dinRail } from "./din-layout.js";
@@ -26,21 +26,43 @@ export const DALI_PSU_PRODUCTS = [
     }),
   }),
   makeSmartProduct({
-    id: "tridonic-dali-ps2",
-    brand: "Tridonic",
-    name: "DALI PS2",
-    sku: "DALI-PS2",
+    id: "lunatone-dali-ps-24033444",
+    brand: "Lunatone",
+    name: "DALI-2 PS 24033444",
+    sku: "24033444",
     kind: "psu",
     zone: "control",
     protocol: ["dali"],
     powerInput: "LN",
-    psuOutput: null,
+    psuOutput: { milliamps: 200 },
+    availability: "外形与输入/输出额定已按厂家资料核验",
+    note: "120–240VAC、50/60Hz 输入，最大输入功耗 5.3W。DALI 输出 12–20.5VDC，保证电流 200mA、最大 250mA，预算采用 200mA。上端从左到右为 DA+、DA−，下端为 N、L。",
+    ...dinRail({
+      modules: 1,
+      widthMm: 17.5,
+      heightMm: 98,
+      depthMm: 56.4,
+      source: { file: "Lunatone DALI-2 PS D0077 (2026-05-25)", url: "https://www.lunatone.com/wp-content/uploads/2018/03/24033444_DALI_PS_EN_D0077.pdf", pages: "2–4：额定、外形尺寸图和端子" },
+    }),
+  }),
+  makeSmartProduct({
+    id: "tridonic-dali-ps2",
+    brand: "Tridonic",
+    name: "DALI PS2",
+    sku: "DALI PS2 · 28000876",
+    kind: "psu",
+    zone: "control",
+    protocol: ["dali"],
+    powerInput: "LN",
+    psuOutput: { voltage: 13.5, amps: 0.24 },
+    availability: "外形与输入/输出额定已按厂家资料核验",
+    note: "订货号 28000876；220–240VAC、50/60Hz 输入，输入功率 4.7W；DALI 输出 13.5V±5%、最大 240mA。上端从左至右为 N、L，下端两枚均标 DA；连接有正负标识的端子前，在电源设置中记录现场核实的正极位置。4.7W 不是输出容量。DALI 非 SELV，不可作为通用直流控制电源；单回路不超过 240mA，线长不超过 300m 且压降不超过 2V。",
     ...dinRail({
       modules: 2,
       widthMm: 36,
       heightMm: 89.5,
       depthMm: 56.8,
-      source: { file: "Tridonic DALI PS2 28000876", url: "https://resources.tridonic.com/PDB/Ressource/GroupPdf/en/DALI_PS2_14303.pdf", pages: "2" },
+      source: { file: "Tridonic DALI PS2 28000876", url: "https://resources.tridonic.com/PDB/Ressource/GroupPdf/en/DALI_PS2_14303.pdf", pages: "2–3：额定、接线、铭牌" },
     }),
   }),
   makeSmartProduct({
@@ -83,4 +105,28 @@ export const DALI_PSU_PRODUCTS = [
       source: { file: "ABB DG/S KNX DALI 网关系列（完整型号待补）", url: "https://new.abb.com/low-voltage/de-ch/produkte/haus-und-gebaeudeautomation/neuigkeiten/abb-i-bus-knx-dali-gateways", pages: "系列介绍" },
     }),
   }),
+  ...[
+    { lines: 1, order: "2CDG110273R0011", inputWatts: 6 },
+    { lines: 2, order: "2CDG110274R0011", inputWatts: 11 },
+  ].map(({ lines, order, inputWatts }) => makeSmartProduct({
+    id: `abb-dg-s-${lines}-64-5-1`,
+    brand: "ABB",
+    name: `DG/S ${lines}.64.5.1`,
+    sku: order,
+    kind: "gateway",
+    zone: "control",
+    protocol: ["dali", "knx"],
+    powerInput: "LN",
+    daliPowerSupply: "internal-only",
+    busConsumption: {value:10, unit:"mA", condition:"KNX 最大总线电流"},
+    availability: "外形、供电与内置 DALI 输出已按厂家资料核验",
+    note: `额定 100–240VAC（50/60Hz），硬件亦支持 110–240VDC，当前按交流输入表示。230VAC 满载输入最大 ${inputWatts}W。内置 ${lines} 路 DALI 输出，每路最多 64 台设备，最低供应电流 160mA（12V），最大 250mA。输出禁止外接其他 DALI 电源。下端 1 L、2 N 与 KNX −/+，上端 DALI A 为 3 DA+、4 DA−${lines===2?'，B 为 5 DA+、6 DA−':''}。机身深 63.5mm，厂家安装深度 68mm。`,
+    ...dinRail({
+      modules: 4,
+      widthMm: 70,
+      heightMm: 90,
+      depthMm: 63.5,
+      source: { file: "ABB DALI Gateway Premium 2CDC507175D0211 Rev. A", url: "https://library.e.abb.com/public/dceb931398e54dbea70af86238a849e3/DGS_x6451_TD_en_V1-0_2CDC507175D0211_Rev_A.pdf", pages: "1–3、5–7：额定、接线与外形" },
+    }),
+  })),
 ];

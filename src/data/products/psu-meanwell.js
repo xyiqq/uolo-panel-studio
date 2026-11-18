@@ -34,7 +34,7 @@ export const MEANWELL_PSU_PRODUCTS = Object.entries(DIMS).map(([sku, dim]) =>
     protocol: sku === "DLP-04R" ? ["dali"] : null,
     psuOutput: sku === "DLP-04R" ? {voltage:16,milliamps:240,watts:3.84} : null,
     note: sku === "DLP-04R"
-      ? "DALI 总线电源，额定输出 16 V DC / 240 mA / 3.84 W，外形 35×90×54.5 mm，预留 2M；非普通 24V 直流电源。"
+      ? "DALI 总线电源，额定输出 16 V DC / 240 mA / 3.84 W，外形 35×90×54.5 mm，预留 2M。上端 2 DA+、1 DA−，下端 4 AC/N、3 AC/L。"
       : "系列外形已核；未指定输出电压后缀，具体电压、电流及降额须按完整订货型号选择。",
     ...dinRail({
       modules: dim.m,
@@ -43,8 +43,8 @@ export const MEANWELL_PSU_PRODUCTS = Object.entries(DIMS).map(([sku, dim]) =>
       depthMm: dim.d,
       source: {
         file: `MEAN WELL ${sku} Dimension`,
-        url: sku === 'DLP-04R' ? 'https://www.meanwell.co.uk/assets/pdf/DLP-04R-spec.pdf' : dim.url || (sku.startsWith("HDR") ? "https://www.meanwell.com/productSearch.aspx?pkeywords=HDR" : `https://www.meanwell.com/Upload/PDF/${sku}/${sku}-SPEC.PDF`),
-        pages: `${dim.w}×${dim.h}×${dim.d} mm`,
+        url: sku === 'DLP-04R' ? 'https://led.meanwell.com/Upload/PDF/DLP-04L/DLP-04-spec.pdf' : dim.url || (sku.startsWith("HDR") ? "https://www.meanwell.com/productSearch.aspx?pkeywords=HDR" : `https://www.meanwell.com/Upload/PDF/${sku}/${sku}-SPEC.PDF`),
+        pages: sku === 'DLP-04R' ? '2、4：额定、外形与端子编号' : `${dim.w}×${dim.h}×${dim.d} mm`,
       },
     }),
   })

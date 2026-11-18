@@ -1,3 +1,4 @@
+import {isIndexedDaliSupply} from '../core/dali-power.js';
 /**
  * 智能/控制模块三维外观（参数化精绘）。
  * 面板纹理按真实贴图宽高比生成高分辨率横版，避免竖图画布被拉糊。
@@ -6,6 +7,10 @@ import { paintModuleFace, moduleFaceSize, faceTextureSize } from "./module-face.
 import { networkSwitchPortLayout } from './network-switch-layout.js';
 import { buildPduDevice } from './pdu-device3d.js';
 import { escapeHtml } from '../core/escape.js';
+import {loadTopology} from '../core/crestron-loads.js';
+import { hasIndependentLoadFeeds, isCresnetController, isCresnetChainSupply, isCresnetReceiver } from "../core/ports.js";
+import {isDinDali2,daliPowerMode} from '../core/dali-power.js';
+import {abbDaliLines,isMdtBusSupply} from '../core/abb-dali.js';
 import { rA, pA, Is, ye, sr, Yt, rr, THREE } from "./three-shim.js";
 
 export const KIND_BODY = {
@@ -115,6 +120,75 @@ function makeFaceTexture(kit, product, faceWmm, faceHmm) {
   return tex;
 }
 
+const DIMMER_LOAD_MARKS = {
+  N: { text: "N", color: "#178ac1" },
+  IN: { text: "L", color: "#23282b" },
+  OUT: { text: "D", color: "#d34743" },
+};
+const CONTROL_POWER_MARKS = { "DC+": "24", "DC-": "G" };
+
+function drawDin4dimu4LoadTerminals(kit, group, ports) {
+  for (const { key, x, y, z, side } of ports) {
+    const load = side === "top" ? /^CH([1-4])_(N|IN|OUT)$/.exec(key) : null;
+    if (!load) continue;
+
+    const mark = DIMMER_LOAD_MARKS[load[2]];
+    kit.cube(group, 3.8, 4.8, 1.8, x, y, z - 0.7, mark.color, 0.4);
+    kit.cube(group, 2.25, 2.6, 0.5, x, y, z, "#141b1c", 0.22);
+    kit.text(group, mark.text, 4.4, 3.6, x, y - 4.4, z + 0.5, "#263239", "#dce1dd");
+    if (load[2] === "IN") {
+      kit.text(group, `CH${load[1]}`, 13, 3.7, x, y - 8.3, z + 0.5, "#263239", "#dce1dd");
+    }
+  }
+}
+
+function drawCresnetTerminals(kit, group, ports, controller) {
+  const blocks = { PWR: [], NET: [] };
+  for (const port of ports) {
+    const { key, x, y, z, side } = port;
+    if (side !== "bottom") continue;
+    const power = CONTROL_POWER_MARKS[key];
+    const mark = power || /^NET[23]?_(24|Y|Z|G)$/.exec(key)?.[1];
+    if (!mark) continue;
+    const block = power && controller ? "PWR" : "NET";
+    blocks[block].push(port);
+    kit.cube(group, 3.4, 4.8, 1.8, x, y, z - 0.7, "#288556", 0.4);
+    kit.cube(group, 2.25, 2.6, 0.5, x, y, z, "#141b1c", 0.22);
+    kit.text(group, mark, 3.4, 3.3, x, y + 4.4, z + 0.5, "#263239", "#dce1dd");
+  }
+  for (const [block, pins] of Object.entries(blocks)) {
+    if (!pins.length) continue;
+    const xs = pins.map((pin) => pin.x);
+    const center = (Math.min(...xs) + Math.max(...xs)) / 2;
+    kit.text(group, block, block === "PWR" ? 9 : 13, 3.8,
+      center, pins[0].y + 8.4, pins[0].z + 0.5, "#263239", "#dce1dd");
+  }
+}
+
+function drawPws50MainsTerminals(kit, group, ports) {
+  for (const { key, x, y, z, side } of ports) {
+    const pin = side === "top" && /^(L|N|PE)_(IN|THRU)$/.exec(key);
+    if (!pin) continue;
+    kit.cube(group, 4.8, 6, 2.5, x, y, z - 1, "#5f6662", 0.4);
+    kit.cube(group, 2.9, 3.2, 0.6, x, y, z, "#141b1c", 0.3);
+    kit.text(group, pin[1] === "PE" ? "⏚" : pin[1], 4.7, 3.5, x, y - 5, z + 0.5, "#263239", "#dce1dd");
+  }
+}
+
+function drawDaliTerminals(kit, group, ports) {
+  for (const loop of [1,2]) {
+    const pins=ports.filter(p=>p.side==='top'&&p.key.startsWith(`DALI${loop}_`));
+    if(!pins.length) continue;
+    for(const {key,x,y,z} of pins){
+      kit.cube(group,5,5.4,2.2,x,y,z-1,'#95b974',.4);
+      kit.screw(group,x,y,z,1.5);
+      kit.text(group,key.includes('PLUS')?'DA+':'DA−',5,3.4,x,y-4.6,z+.4,'#263239','#dce1dd');
+    }
+    const xs=pins.map(p=>p.x);
+    kit.text(group,`DALI ${loop}`,17,3.6,(Math.min(...xs)+Math.max(...xs))/2,pins[0].y-8.1,pins[0].z+.4,'#263239','#dce1dd');
+  }
+}
+
 /**
  * @param {*} kit
  * @param {object} product
@@ -129,12 +203,12 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
   const w = Math.max(16, Number(product.width) || (Number(product.modules) || 2) * 18);
   const h = Math.max(70, Number(product.height) || 90);
   const d = Math.max(40, Number(product.depth) || 58);
-  const body =
-    product.kind === "terminal"
-      ? product.terminalColor === "blue"
-        ? "#2f6fbf"
-        : "#8a8f96"
-      : KIND_BODY[product.kind] || "#3a4550";
+  const din4dimu4 = hasIndependentLoadFeeds(product);
+  const cresnetController = isCresnetController(product);
+  const chainSupply = isCresnetChainSupply(product);
+  const daliGateway = isDinDali2(product);
+  const modeledCresnet = isCresnetReceiver(product) || cresnetController || chainSupply;
+  const body = modeledCresnet ? "#d9ddd7" : KIND_BODY[product.kind] || "#3a4550";
   const accent = BRAND_ACCENT[product.brand] || product.color || "#7a8a9a";
 
   // 安装侧面与目录宽度一致，平直侧边避免贴合后仍因缩宽、圆角露出背板。
@@ -169,13 +243,15 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
   }
 
   // 端子条
-  kit.cube(s, w - 6, 5.5, 3.5, 0, h / 2 - 7, d + 4, "#151a20", 1, 0.45);
-  kit.cube(s, w - 6, 5.5, 3.5, 0, -h / 2 + 7, d + 4, "#151a20", 1, 0.45);
+  if (!modeledCresnet) {
+    kit.cube(s, w - 6, 5.5, 3.5, 0, h / 2 - 7, d + 4, "#151a20", 1, 0.45);
+    kit.cube(s, w - 6, 5.5, 3.5, 0, -h / 2 + 7, d + 4, "#151a20", 1, 0.45);
+  }
 
   const ch = 1; // 仅保留仿真状态灯；通道外观已在矢量面板逐一绘制。
   let led = null;
   for (let i = 0; i < ch; i++) {
-    const x = -w / 2 + Math.min(9, w * 0.3);
+    const x = -w / 2 + (cresnetController ? 53 : Math.min(9, w * 0.3));
     const bulb = kit.cube(s, 2.8, 2.8, 1.4, x, -h * 0.36, d + 11.5, "#667b6d", 0.2, 0.15);
     bulb.material = kit.own(
       new rA({
@@ -194,12 +270,47 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
     led.userData.dynamic = true;
   }
 
-  const toggle = kit.cube(s, Math.min(12, w * 0.16), 4.5, 3.5, w / 2 - Math.min(10, w * 0.3), -h * 0.36, d + 11.5, "#4a5562", 1.1);
-  toggle.userData.dynamic = true;
-  toggle.userData.onY = -h * 0.36;
-  toggle.userData.offY = -h * 0.36 - 3;
+  let toggle = null;
+  if (daliGateway) {
+    const y=h/2-6, z=d+8;
+    kit.cube(s,13,6,2,0,y,z-1,'#66716a',.5);
+    kit.cube(s,9,3.2,1,0,y,z+.3,'#26302b',.3);
+    const mode=daliPowerMode(product);
+    if(mode==='INT'||mode==='EXT') kit.cube(s,4,3.2,1.5,mode==='INT'?-2.5:2.5,y,z+1.2,'#a7b0a9',.25);
+    kit.text(s,'INT   EXT',17,3.6,0,y-5,z+.5,'#263239','#dce1dd');
+  } else if (chainSupply) {
+    kit.cube(s, 39, 7, 2, -28, -h / 2 + 6, d + 7, "#c2c8c1", 0.7);
+    kit.text(s, "FUSE", 13, 3.4, -28, -h / 2 + 12, d + 8.5, "#263239", "#dce1dd");
+  } else {
+    toggle = kit.cube(s, Math.min(12, w * 0.16), 4.5, 3.5, w / 2 - Math.min(10, w * 0.3), -h * 0.36, d + 11.5, "#4a5562", 1.1);
+    toggle.userData.dynamic = true;
+    toggle.userData.onY = -h * 0.36;
+    toggle.userData.offY = -h * 0.36 - 3;
+  }
 
-  if (product.interfaceProfile === 'din-tcp') {
+  if (modeledCresnet) {
+    if(loadTopology(product)) {
+      for(const p of ports.filter(pin=>pin.marking&&!pin.key.startsWith('NET')&&!pin.key.startsWith('DC'))) {
+        kit.cube(s,3.5,4.5,1.9,p.x,p.y,p.z-0.8,p.conductor==='N'?'#668db9':p.conductor==='PE'?'#57a476':'#7f7471',.35);
+        kit.screw(s,p.x,p.y,p.z,1.25);
+        const label=p.marking.replace(/^CH(\d+)_(IN|OUT)$/,(_,ch,io)=>ch+(io==='IN'?'i':'o'));
+        kit.text(s,label,5.1,3,p.x,p.y+(p.side==='top'?-5:5),p.z+.5,'#263239','#dce1dd');
+      }
+    }
+    if (din4dimu4) drawDin4dimu4LoadTerminals(kit, s, ports);
+    if (daliGateway || product.id === 'crestron-din-dli') drawDaliTerminals(kit,s,ports);
+    if (chainSupply) drawPws50MainsTerminals(kit, s, ports);
+    drawCresnetTerminals(kit, s, ports, cresnetController);
+    if (cresnetController) {
+      const com = ports.filter(p=>p.key.startsWith('COM1_'));
+      for (const {key,x,y,z} of com) {
+        kit.cube(s,3.4,4.8,1.8,x,y,z-.7,'#3e7055',.4);
+        kit.cube(s,2.25,2.6,.5,x,y,z,'#141b1c',.22);
+        kit.text(s,key.slice(5),3.4,3.3,x,y+4.4,z+.5,'#263239','#dce1dd');
+      }
+      if (com.length) kit.text(s,'COM 1',11,3.8,com[2].x,com[2].y+8.4,com[2].z+.5,'#263239','#dce1dd');
+    }
+  } else if (product.interfaceProfile === 'din-tcp') {
     // USMART 的 RJ45 与可插拔 RS-485 端子都从设备顶部插拔，
     // 不应沿用普通模块的前向端子。顶部只保留外壳铭牌和状态控件。
     const serialCount = Math.max(0, Number(product.serialPorts) || 0);
@@ -232,6 +343,10 @@ export function buildSmartDevice(kit, product, ports = [], label = "") {
     for (const p of ports) {
       kit.cube(s, 5.5, 6.5, 2, p.x, p.y, p.z - 2, "#8a949c", 1);
       kit.screw(s, p.x, p.y, p.z, 2);
+      if ((loadTopology(product)==='threePhase' || isIndexedDaliSupply(product) || abbDaliLines(product) || isMdtBusSupply(product)) && p.marking) {
+        const labelY = p.y + (p.side === 'top' ? -5 : 5);
+        kit.text(s, p.key.startsWith('RS485_') ? p.key.slice(6) : p.marking, 6.8, 3.5, p.x, labelY, p.z + 0.5, "#263239", "#dce1dd");
+      }
     }
   }
 

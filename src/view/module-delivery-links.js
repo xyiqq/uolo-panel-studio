@@ -19,7 +19,7 @@ export function moduleDeliveryLinks(design, net = {}) {
   for (const wire of net?.wires || []) {
     if (!(wire.moduleFeed || wire.moduleNeutral || wire.terminalConnection || String(wire.id || '').startsWith('module-wire:'))) continue;
     physical.add(`${wire.from}>${wire.to}`);
-    const specification = wire.section == null || wire.section === '' ? '线径/规格待核'
+    const specification = wire.bridgeJumper ? wire.material : wire.section == null || wire.section === '' ? '线径/规格待核'
       : typeof wire.section === 'number' ? `${wire.section} mm²` : String(wire.section);
     add({from:wire.from, to:wire.to, kind:wire.scope || (wire.terminalConnection ? '模块 → 接线端子' : wire.moduleNeutral ? '负载零线（不经过继电器触点）' : wire.moduleFeed ? '空开 → 模块馈电' : wire.class || '模块链路'),
       detail:[wire.loadName, wire.wireNo && `线号 ${wire.wireNo}`, specification, wire.circuit, wire.connected === false ? '未连接' : '已连接'].filter(Boolean).join(' · ')});

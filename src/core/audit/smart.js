@@ -17,7 +17,7 @@ export function auditSmart(design, assembly, budgets = [], opts = {}) {
 
   for (const b of budgets || []) {
     const id = b.busId || b.id;
-    if (!b.hasPsu) {
+    if (!b.hasPsu && !b.dataOnly) {
       issues.push({
         code: "BUS_NO_PSU",
         level: "error",

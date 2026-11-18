@@ -6,6 +6,13 @@
 import { rowAllows } from './row-zones.js';
 import { normalizeSwitchSettings } from './network-switch-settings.js';
 import { normalizePduSettings } from './pdu-settings.js';
+import { hasIndependentLoadFeeds } from './ports.js';
+import { normalizeDimmerBridgeMode } from './dimmer-bridging.js';
+import {qsLinkCount, normalizeQsConfig,clearQsReferences} from './qs-link.js';
+import {DALI_LOOPS, isDinDali2, normalizeDaliPower} from './dali-power.js';
+import {daliFieldLineCount,normalizeDaliFieldLoops} from './abb-dali.js';
+import {loadSettings} from './crestron-loads.js';
+import {clearFieldTerminalRefs, ensureLoadTerminalFree} from './field-terminals.js';
 import {canPlaceFootprint,reserveFootprint,placementY,placementWidth,placementColumns,usePhysicalOccupancy} from './placement-footprint.js';
 
 export const SHARED_MODULE_KINDS = [
@@ -159,6 +166,16 @@ export function normalizeModule(raw, product = null) {
   return {
     id: raw.id,
     productId: raw.productId,
+    ...(raw.productId === 'crestron-din-ap4' ? {
+      rs485Meters:Array.isArray(raw.rs485Meters) ? raw.rs485Meters.map(id=>typeof id === 'string' && id ? id : null) : [],
+      rs485MetersLength:raw.rs485MetersLength == null || raw.rs485MetersLength === '' ? null : Number(raw.rs485MetersLength),
+    } : {}),
+    ...loadSettings(raw),
+    ...(raw.productId==='tridonic-dali-ps2' && ['left','right'].includes(raw.daliPositiveSide) ? {daliPositiveSide:raw.daliPositiveSide} : {}),
+    ...(qsLinkCount(raw.productId) && raw.qsConfig ? {qsConfig:normalizeQsConfig(raw.qsConfig,qsLinkCount(raw.productId))} : {}),
+    ...(isDinDali2(product ?? {id:raw.productId}) ? normalizeDaliPower(raw) : {}),
+    ...(daliFieldLineCount(product ?? {id:raw.productId}) ? {daliFieldLoops:normalizeDaliFieldLoops(raw.daliFieldLoops,product ?? {id:raw.productId})} : {}),
+    ...(hasIndependentLoadFeeds(product ?? {id: raw.productId}) ? {bridgeMode: normalizeDimmerBridgeMode(raw.bridgeMode)} : {}),
     ...(product?.networkPorts?normalizeSwitchSettings(raw,product):{}),
     ...(product?.outletCount?normalizePduSettings(raw,product):{}),
     label: typeof raw.label === "string" && raw.label.trim() ? raw.label.trim().slice(0, 40) : raw.id,
@@ -293,6 +310,12 @@ export function normalizeBuses(design) {
     .map((b) => ({
       id: b.id,
       type: b.type || "dc",
+      ...(b.type === 'cresnet' && Object.hasOwn(b, 'controllerModuleId')
+        ? {controllerModuleId: typeof b.controllerModuleId === 'string' ? b.controllerModuleId : null} : {}),
+      ...(b.type === 'cresnet' && Object.hasOwn(b, 'controllerModuleId') && Object.hasOwn(b, 'chainSupplyModuleId') ? {
+        chainSupplyModuleId: typeof b.chainSupplyModuleId === 'string' ? b.chainSupplyModuleId : null,
+        chainPowerMeters: Number.isFinite(b.chainPowerMeters) && b.chainPowerMeters > 0 ? b.chainPowerMeters : null,
+      } : {}),
       label: typeof b.label === "string" && b.label ? b.label : b.id,
       psuModuleIds: Array.isArray(b.psuModuleIds) ? b.psuModuleIds.filter(Boolean) : [],
       deviceModuleIds: Array.isArray(b.deviceModuleIds) ? b.deviceModuleIds.filter(Boolean) : [],
@@ -313,7 +336,7 @@ export function normalizeBuses(design) {
  * @param {object} design
  * @param {(id:string)=>object|null} findProduct
  */
-export function syncCircuitDevices(design, findProduct) {
+export function syncCircuitDevices(design, findProduct, {preserveMeterPlan=false}={}) {
   const modules = design.modules || [];
   const byCircuit = new Map();
   for (const mod of modules) {
@@ -337,9 +360,24 @@ export function syncCircuitDevices(design, findProduct) {
       if (c.rcdProductId) base.push({ role: "rcd", productId: c.rcdProductId });
     }
     const extras = byCircuit.get(c.id) || [];
+    const existing=(c.devices||[]).filter(d=>!['protection','rcd'].includes(d.role));
+    const hasDirectMeter=d=>modules.some(m=>m.id===d.moduleId && m.productId==='eastron-sdm630-modbus-v2');
+    // Loading must expose contradictory saved plans. Deliberate edits recalculate their order below.
+    if(preserveMeterPlan && existing.length && [...existing,...extras].some(hasDirectMeter)){
+      c.devices=[...base,...existing];continue;
+    }
     const saved=new Map((c.devices||[]).filter(d=>d.moduleId).map((d,i)=>[`${d.moduleId}:${d.channel}`,i]));
     extras.sort((a,b)=>(saved.get(`${a.moduleId}:${a.channel}`)??Infinity)-(saved.get(`${b.moduleId}:${b.channel}`)??Infinity)
       || (a.role==='meter')-(b.role==='meter') || a.channel-b.channel || a.moduleId.localeCompare(b.moduleId));
+    const stage = d => modules.find(m=>m.id===d.moduleId)?.seriesStages?.[d.channel];
+    const controls=extras.filter(d=>d.role==='control').sort((a,b)=>stage(a)-stage(b));
+    if(controls.length>1 && controls.every((d,i)=>stage(d)===i+1)) {
+      extras.splice(0,extras.length,...controls,...extras.filter(d=>d.role!=='control'));
+    }
+    if(extras.length>1 && extras.every(d=>d.role==='meter' && hasDirectMeter(d))) {
+      const ordered=[...extras].sort((a,b)=>stage(a)-stage(b));
+      if(ordered.every((d,i)=>stage(d)===i+1)) extras.splice(0,extras.length,...ordered);
+    }
     c.devices = [...base, ...extras];
   }
   return design;
@@ -368,9 +406,28 @@ export function releaseCircuitFromModules(design, circuitId) {
  */
 export function removeModule(design, moduleId) {
   design.modules = (design.modules || []).filter((m) => m.id !== moduleId);
+  if(design.states) delete design.states[moduleId];
+  const touchesRemovedModule=key=>{
+    const ends=/^module-(?:wire|feed):([^:>]+):[^>]+>([^:>]+):/.exec(key);
+    return ends && (ends[1]===moduleId || ends[2]===moduleId);
+  };
+  if(design.disconnected) design.disconnected=design.disconnected.filter(id=>!touchesRemovedModule(id));
+  for(const id of Object.keys(design.wireOverrides || {})) if(touchesRemovedModule(id)) delete design.wireOverrides[id];
+  for (const mod of design.modules) {
+    if (mod.rs485Meters?.includes(moduleId)) mod.rs485Meters = mod.rs485Meters.map(id=>id === moduleId ? null : id);
+    clearQsReferences(mod,moduleId);
+    clearFieldTerminalRefs(mod, moduleId);
+    for (const loop of DALI_LOOPS) {
+      if (mod.daliLoopSupplies?.[loop] === moduleId) mod.daliLoopSupplies[loop] = null;
+    }
+  }
   for (const bus of design.buses || []) {
+    if (bus.controllerModuleId === moduleId) bus.controllerModuleId = null;
+    if (bus.chainSupplyModuleId === moduleId) bus.chainSupplyModuleId = null;
     bus.psuModuleIds = (bus.psuModuleIds || []).filter((id) => id !== moduleId);
-    bus.deviceModuleIds = (bus.deviceModuleIds || []).filter((id) => id !== moduleId);
+    const members = bus.deviceModuleIds || [];
+    bus.deviceModuleIds = bus.type === 'cresnet' && Object.hasOwn(bus,'controllerModuleId')
+      ? members.map(id=>id === moduleId ? '!'+moduleId : id) : members.filter(id=>id !== moduleId);
   }
   for (const c of design.circuits || []) {
     if (Array.isArray(c.devices)) {
@@ -696,6 +753,7 @@ export function buildChannelWireSchematic(design, findProduct = null) {
  * 将继电器通道挂到端子；同步端子侧 link。
  */
 export function linkChannelTerminal(design, moduleId, channel, terminalId) {
+  if (terminalId) ensureLoadTerminalFree(design,terminalId);
   const mod = (design.modules || []).find((m) => m.id === moduleId);
   if (!mod) throw new Error("模块不存在");
   const ch = +channel;

@@ -19,7 +19,7 @@ describe('USMART 接口模块与明纬完整型号',()=>{
       expect(labels.filter(s=>/^485-\d+$/.test(s))).toHaveLength(count);
       expect(labels).toContain('24V DC');
       expect(p.serialPortLabels).toEqual(Array.from({length:count},(_,i)=>`485-${i+1}`));
-      expect(buildPortTemplates(p).filter(port=>port.conductor.startsWith('RS485-'))).toHaveLength(count*2);
+      expect(buildPortTemplates(p).map(port=>port.key)).toEqual(['DC+','DC-']);
     }
   });
   it('完整型号额定输出与厂家规格一致，DLP-04R 不重复添加',()=>{

@@ -149,7 +149,7 @@ export function buildDocumentPack(ctx = {}) {
   pages.push({
     id: "wiring-table",
     title: "接线表",
-    html: renderWiringTable({ net, labels }),
+    html: renderWiringTable({ assembly, net, labels }),
     pageSize: "A4",
   });
 

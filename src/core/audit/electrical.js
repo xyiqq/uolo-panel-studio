@@ -1,6 +1,6 @@
 import {resolveModuleFeedBindings,isMainsFedModule} from '../module-feeds.js';
 import {rowZoneIssues} from '../row-zones.js';
-import {loadPowerInput} from '../ports.js';
+import {hasIndependentLoadFeeds,loadPowerInput} from '../ports.js';
 
 /** 根据方案已知数据做预检查；未知额定与未录入负荷保留待核。 */
 export function auditElectrical(design,assembly,net,budgets=[]) {
@@ -28,8 +28,8 @@ export function auditElectrical(design,assembly,net,budgets=[]) {
       if(positive(rating)&&total>rating)add('MODULE_TOTAL_OVERCURRENT','error',mod.id,`${mod.id} 已知负荷通道合计至少 ${total.toFixed(2)} A，超过模块总额定 ${rating} A`);
       if(!positive(rating))add('MODULE_TOTAL_UNKNOWN','pending',mod.id,`${mod.id} 模块总额定电流待核`);
     }
-    if(isMainsFedModule(p)){
-      const feeds=bindings.filter(b=>b.moduleId===mod.id);
+    const feeds=bindings.filter(b=>b.moduleId===mod.id);
+    if(isMainsFedModule(p)||(hasIndependentLoadFeeds(p)&&feeds.length)){
       if(!feeds.length)add('MODULE_PROTECTION_MISSING','pending',mod.id,`${mod.id} 未确定上游保护回路`);
       for(const feed of feeds){
         const breaker=nodes.get(feed.breakerId),amps=breaker?.product?.amps;
@@ -45,12 +45,12 @@ export function auditElectrical(design,assembly,net,budgets=[]) {
     if(p.protocol?.some(v=>['wifi','zigbee','bluetooth','thread'].includes(v)))add('METAL_CABINET_RADIO','warning',mod.id,`${mod.id} 含无线协议，金属箱内需实测信号或外置天线方案`);
   }
   for(const b of budgets){
-    if(!b.usedKnown||!b.capacityKnown)add('BUS_PARAMETERS_UNKNOWN','pending',b.id,`${b.label||b.id} 预算待核：${b.pending?.join('；')||'容量未确认'}`);
+    if(!b.dataOnly&&(!b.usedKnown||!b.capacityKnown))add('BUS_PARAMETERS_UNKNOWN','pending',b.id,`${b.label||b.id} 预算待核：${b.pending?.join('；')||'容量未确认'}`);
     if(b.type==='dc'&&b.utilization>.8)add('DC_RESERVE','warning',b.id,`${b.label||b.id} 使用率 ${(b.utilization*100).toFixed(1)}%，超过本工具 80% 设计余量提醒值（非厂家硬性额定）`);
   }
   for(const bus of design.buses||[]){
     if(bus.segregation!=='SELV')continue;
-    for(const id of [...(bus.psuModuleIds||[]),...(bus.deviceModuleIds||[])]){
+    for(const id of [...(bus.psuModuleIds||[]),...(bus.deviceModuleIds||[]),bus.controllerModuleId,bus.chainSupplyModuleId].filter(Boolean)){
       const n=nodes.get(id);if(!n||n.overflow)continue;
       if([...nodes.values()].some(other=>!other.overflow&&other.row===n.row&&other.product?.zone!=='control'))add('SELV_ROW_REVIEW','warning',id,`${id} 的 SELV 总线与强电器件同排，需核实隔板及线路隔离；分排不代替绝缘核验`);
     }

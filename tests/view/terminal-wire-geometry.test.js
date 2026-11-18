@@ -1,6 +1,6 @@
 import {it,expect} from 'vitest';
 import {Vector3} from 'three';
-import {terminalWireGeometry,terminalPanelWirePoints} from '../../src/view/wire-routing.js';
+import {routeDimmerJumper,terminalWireGeometry,terminalPanelWirePoints} from '../../src/view/wire-routing.js';
 
 it('panel wire stays clear of the backplate and samples every elbow at full radius',()=>{
   const points=terminalPanelWirePoints(new Vector3(100,-100,65),new Vector3(-90,150,40));
@@ -25,4 +25,23 @@ it('coincident bends and exploded depth remain finite',()=>{
   const geometry=terminalWireGeometry(points);
   expect([...geometry.attributes.position.array].every(Number.isFinite)).toBe(true);
   geometry.dispose();
+});
+
+it('leaves an upper DIM output through the top of the module',()=>{
+  const start = new Vector3(15, 30, 68);
+  const points = terminalPanelWirePoints(start, new Vector3(-10, -30, 40), 0, 0, 'top');
+  expect(points[0]).toEqual(start);
+  expect(points[1].y).toBeGreaterThan(start.y);
+  expect(points[2].z).toBe(38);
+});
+
+it('draws factory jumpers locally on separate L, N and D lanes',()=>{
+  const from = {x:0, y:100, z:68}, to = {x:14.4, y:100, z:68};
+  const curves = ['L', 'N', 'D'].map(terminal => routeDimmerJumper(from, to, terminal));
+  for (const {points} of curves) {
+    expect(points[0]).toMatchObject(from);
+    expect(points.at(-1)).toMatchObject(to);
+    expect(points.every(p => p.x >= from.x && p.x <= to.x && p.z === from.z)).toBe(true);
+  }
+  expect(new Set(curves.map(({points}) => points[1].y)).size).toBe(3);
 });

@@ -1,3 +1,7 @@
+import {isDinDali2} from '../core/dali-power.js';
+import {daliSettingsSummary} from './dali-power.js';
+import {qsSummary} from '../core/qs-link.js';
+import {daliFieldLineCount,fieldLineLabel,daliFieldCapacity,fieldBudgetLabel} from '../core/abb-dali.js';
 /**
  * 配电系统图 SVG 生成器
  * A4 纵向内容版心；每行两个回路，按文字高度自动分页。
@@ -200,6 +204,23 @@ export function renderSystemDiagram(design = {}, assembly, net, matches = {}) {
 
   const links = moduleDeliveryLinks(design, net);
   const recordedLinks = new Set(links.map(link => `${link.from}>${link.to}`));
+  for(const node of assembly?.nodes||[]){
+    if (node.module?.rs485Meters?.length) links.push({from:node.id+' COM1',
+      to:node.module.rs485Meters.map(id=>id||'设备待选').join(' → '),kind:'RS-485 串接配置',
+      detail:(node.module.rs485MetersLength??'待核')+' m · Modbus RTU，终端电阻位于总线两端。'});
+    if(node.module?.qsConfig)links.push(...qsSummary(node.module));
+    if(daliFieldLineCount(node.product)) {
+      for(const [index,line] of Object.entries(node.module?.daliFieldLoops || {})){
+        const capacity=daliFieldCapacity(node.product,node.module,index,id=>assembly.nodes.find(n=>n.id===id)?.product);
+        links.push({from:node.id+' '+fieldLineLabel(node.product,index),to:line.name||'现场驱动器组',
+          kind:'DALI 出线预算',detail:fieldBudgetLabel(line,capacity)});
+      }
+    }
+    if(isDinDali2(node.product)){
+      links.push({from:node.id+' DIN-DALI-2',to:'DALI 1 / DALI 2',kind:'整机拨档',
+        detail:daliSettingsSummary(node.module,node.product)});
+    }
+  }
   // Include upstream supply, surge protection and enclosure earth connections;
   // the circuit cards alone only show the wires assigned to each branch.
   for (const wire of net?.wires || []) {
@@ -209,6 +230,19 @@ export function renderSystemDiagram(design = {}, assembly, net, matches = {}) {
   }
   for (const budget of computeBusBudgets(design, (assembly?.nodes || []).map(n => n.product).filter(Boolean))) {
     const bus = design.buses.find(b => b.id === budget.id);
+    if (budget.cresnetChain) {
+      const used=budget.usedKnown?textOrDash(budget.used):'待核';
+      const capacity=budget.capacityKnown?textOrDash(budget.capacity):'待核';
+      links.push({from:`DIN-AP4 ${bus.controllerModuleId || '待选'} → DIN-PWS50 ${bus.chainSupplyModuleId || '待核'}`,
+        to:(bus.deviceModuleIds || []).join(' → ') || '待选成员',kind:'Cresnet 串接配置',
+        detail:`主机至电源 Y/Z/G · 电源至成员 24/Y/Z/G · 预算 ${used}/${capacity} W${budget.overBudget?' · 超预算':''}`});
+      continue;
+    }
+    if (budget.dataOnly) {
+      links.push({from:`Cresnet 主机 ${bus.controllerModuleId || '待选'}`, to:(bus.deviceModuleIds || []).join(' / ') || '待选成员',
+        kind:'NET 通信配置', detail:'Y/Z 数据、G 参考；24/G 控制供电另列。实际接线见相应端子行。'});
+      continue;
+    }
     links.push({from:`总线 ${budget.label || budget.id} (${budget.type})`,to:`设备 ${(bus.deviceModuleIds || []).join(' / ') || '—'}`,
       kind:`电源 ${(bus.psuModuleIds || []).join(' / ') || '未配置'}`,
       detail:`预算 ${budget.usedKnown ? textOrDash(budget.used) : '待核'}/${budget.capacityKnown ? textOrDash(budget.capacity) : '待核'} ${budget.unit || ''} · ${budget.deviceCount} 台${budget.overBudget ? ' · 超预算' : ''}`});

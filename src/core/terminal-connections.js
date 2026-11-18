@@ -1,3 +1,8 @@
+import {hasIndependentLoadFeeds, supportsLoadWiring} from './ports.js';
+import {dimmerGroupUsesIncludedJumpers, dimmerOutputGroups} from './dimmer-bridging.js';
+import {loadTopology} from './crestron-loads.js';
+import {fieldTerminalClaims} from './field-terminals.js';
+
 // Each PT2.5 slice has one field connection and one panel connection.
 export const OUTPUT_KINDS = ['relay', 'dimmer', 'contactor', 'timer'];
 export function terminalRows(design, resolve) {
@@ -12,12 +17,17 @@ export function terminalRows(design, resolve) {
   });
 }
 export function outputOptions(design, resolve) {
+  const singlePhaseCircuits = new Set((design.circuits || []).filter(c => c.voltage === 220).map(c => c.id));
   return (design.modules || []).flatMap(m => {
     const p = resolve(m.productId);
-    if (!OUTPUT_KINDS.includes(p?.kind)) return [];
-    return Array.from({length: p.channels || 0}, (_, i) => ({
-      value: `${m.id}:CH${i + 1}_OUT`, label: `${m.id} · CH${i + 1} · ${m.label}`,
-    }));
+    if (['motor','commonMotor'].includes(loadTopology(p)) || !OUTPUT_KINDS.includes(p?.kind) || !supportsLoadWiring(p)) return [];
+    const independent = hasIndependentLoadFeeds(p);
+    const outputs = independent ? dimmerOutputGroups(m.bridgeMode) || [] : Array.from({length: p.channels || 0}, (_, i) => [i + 1]);
+    return outputs.filter(group => !independent || (m.feed === 'perChannel' && dimmerGroupUsesIncludedJumpers(group) && singlePhaseCircuits.has(m.channels?.[group[0]])))
+      .map(([ch, ...members]) => ({
+        value: `${m.id}:CH${ch}_OUT`,
+        label: `${m.id} · CH${ch}${independent ? ' DIM' : ''}${members.length ? `（桥接 CH${members.join('、CH')}）` : ''} · ${m.label}`,
+      }));
   });
 }
 // Follow the displayed module/channel order, without replacing existing wiring.
@@ -50,10 +60,14 @@ export function sequentialWireNumbers(rows, terminalId) {
 }
 
 export function saveTerminalRows(design, rows, resolve) {
+  const claims = fieldTerminalClaims(design);
   const known = new Map(terminalRows(design, resolve).map(r => [`${r.terminalId}:${r.pole}`,r]));
   const outputs = new Set(outputOptions(design, resolve).map(o => o.value));
   const used = new Set();
   const cleaned = rows.map(r => {
+    if (r.output && claims.get(`${r.terminalId}:${r.pole}`)?.some(c => c.field !== 'load')) {
+      throw new Error(`${r.terminalId}:${r.pole} 已分配给信号回路，请选择空闲端子`);
+    }
     if (!known.has(`${r.terminalId}:${r.pole}`)) throw new Error('端子不存在或节号超出范围');
     if (r.output && !outputs.has(r.output)) throw new Error('所选输出通道已不存在');
     if (r.output && used.has(r.output)) throw new Error(`${r.output} 已连接其他端子，请选择空闲通道`);
@@ -86,7 +100,7 @@ export function terminalWireSegments(design, assembly, resolve, net) {
     const term = nodes.get(r.terminalId);
     const match = /^(.*):CH(\d+)_OUT$/.exec(r.output || '');
     const output = match && nodes.get(match[1]);
-    if (!term || term.overflow || !output || output.overflow) continue;
+    if (!term || term.overflow || !output || ['motor','commonMotor'].includes(loadTopology(output.product)) || output.overflow || !supportsLoadWiring(output.product)) continue;
     const count = term.product.poles || term.product.channels || 1;
     const x = term.x - term.product.width/2 + (r.pole-.5)*term.product.width/count;
     const y = term.y;
@@ -98,7 +112,9 @@ export function terminalWireSegments(design, assembly, resolve, net) {
     const chainEnd=net?.wires.find(w=>w.circuit===circuit?.id&&circuit&&w.scope==='模块链 → 出箱端子');
     const physicalOutput=chainEnd?.from||r.output;
     const actualPort=net?.ports?.[physicalOutput];
-    if(actualPort) source={x:actualPort.x,y:actualPort.y,z:actualPort.z};
+    if(hasIndependentLoadFeeds(output.product) && (!actualPort || chainEnd?.from !== r.output)) continue;
+    if(circuit && loadTopology(output.product) && (!chainEnd || net?.wires.some(w=>w.from===r.output && w.scope==='干接点级间馈电'))) continue;
+    if(actualPort) source={x:actualPort.x,y:actualPort.y,z:actualPort.z,side:actualPort.side};
     const fieldName=output.module?.channelLabels?.[ch] || circuit?.name || r.loadName || `${output.module?.displayName||output.label||output.id} CH${ch}`;
     segments.push({id:`${r.terminalId}:${r.pole}`, ...r, physicalOutput, replacedWireId:chainEnd?.id, fieldName, source, target,
       field:{x,y:y+term.product.height/2,z:term.product.depth+5}});
