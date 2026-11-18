@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {Studio3D} from './studio3d.js';
 import {findProduct} from '../core/domain.js';
 import {terminalWireSegments} from '../core/terminal-connections.js';
-import {terminalWireGeometry, terminalPanelWirePoints, routeCabinetWire, OrthogonalWireCurve} from './wire-routing.js';
+import {terminalWireGeometry, terminalPanelWirePoints, routeCabinetWire, routeDimmerJumper, hasSignalLane, OrthogonalWireCurve} from './wire-routing.js';
 import {terminalLabelLayout} from './terminal-label-layout.js';
 import {nodeExplosionOffset, connectionInspection, wireTouchesSelection} from './exploded-wiring.js';
 
@@ -87,8 +87,9 @@ export class TerminalStudio3D extends Studio3D {
       const a=from.supplyReference?0:this.offset(from.node),b=this.offset(to.node),key=`${a}:${b}:${this.compactChain()}:${from.x}:${from.y}:${from.z}:${to.x}:${to.y}:${to.z}`;
       if(ref.poseKey===key) continue;
       ref.poseKey=key;
-      let curve=routeCabinetWire(from,to,ref.edge.conductor,this.model.box,this.net.nodes.find(n=>n.id==='N')?.x);
-      if(this.compactChain()||from.supplyReference) {
+      let curve=ref.edge.bridgeJumper ? routeDimmerJumper(from,to,ref.edge.bridgeTerminal)
+        : routeCabinetWire(from,to,ref.edge.conductor,this.model.box,this.net.nodes.find(n=>n.id==='N')?.x,ref.edge.cresnet,ref.edge.daliLoop);
+      if(!ref.edge.bridgeJumper&&!hasSignalLane(ref.edge)&&(this.compactChain()||from.supplyReference)) {
         const startY=from.y+(from.side==='bottom'?-13:13),endY=to.y+(to.side==='bottom'?-13:13),z=38;
         curve=new OrthogonalWireCurve([new THREE.Vector3(from.x,from.y,from.z),new THREE.Vector3(from.x,startY,from.z),new THREE.Vector3(from.x,startY,z),new THREE.Vector3(to.x,startY,z),new THREE.Vector3(to.x,endY,z),new THREE.Vector3(to.x,endY,to.z),new THREE.Vector3(to.x,to.y,to.z)]);
       }
@@ -189,9 +190,10 @@ export class TerminalStudio3D extends Studio3D {
       if(this.terminalWiresVisible===false||options.wireMode==='none'||((options.isolate||options.wireMode!=='all')&&!direct)) return;
       const sourceOffset=this.offset(outputId),targetOffset=this.offset(s.terminalId);
       const a=new THREE.Vector3(s.source.x,s.source.y,s.source.z+sourceOffset),b=new THREE.Vector3(s.target.x,s.target.y,s.target.z+targetOffset);
-      addWire(terminalPanelWirePoints(a,b,i,Math.min(sourceOffset,targetOffset)),s.section);
+      addWire(terminalPanelWirePoints(a,b,i,Math.min(sourceOffset,targetOffset),s.source.side),s.section);
       if(detail&&direct) {
-        addDetail(`${(s.physicalOutput||s.output).replace('_OUT','')} → ${s.id} · ${s.wireNo||'无线号'} · ${s.section?`${s.section} mm²`:'线径待核'}`,'#8d2424');
+        const from = s.physicalOutput || s.output;
+        addDetail(`${net.ports[from]?.displayTag || from.replace('_OUT','')} → ${s.id} · ${s.wireNo||'无线号'} · ${s.section?`${s.section} mm²`:'线径待核'}`,'#8d2424');
       }
       if(!detail&&layout.labels[i]) {
         const f=new THREE.Vector3(s.field.x,s.field.y,s.field.z+targetOffset),{x,y,width,height}=layout.labels[i];
@@ -213,7 +215,10 @@ export class TerminalStudio3D extends Studio3D {
     if(detail&&options.wireMode!=='none') {
       const shownPorts=new Set();
       for(const ref of this.model.wires.values()) if(ref.mesh.visible&&this.inspection.wireIds.has(ref.edge.id)) {
-        const w=ref.edge;addDetail(`${w.from} → ${w.moduleNeutral?`${w.moduleId}负载零线`:w.to} · ${w.conductor} · ${w.section} mm²`,'#28546a');
+        const w=ref.edge;
+        const from = net.ports[w.from]?.displayTag || w.from;
+        const to = w.moduleNeutral ? `${w.moduleId}负载零线` : net.ports[w.to]?.displayTag || w.to;
+        addDetail(`${from} → ${to} · ${w.conductor} · ${w.section} mm²`,'#28546a');
         if(options.isolate) for(const id of [w.from,w.to]) {
           const port=this.displayedPorts(w)[id===w.from?0:1];
           if(this.model.parts.has(port.node)||shownPorts.has(id)) continue;

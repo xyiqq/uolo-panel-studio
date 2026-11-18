@@ -75,7 +75,7 @@ export const KNX_PRODUCTS = [
       widthMm: 72,
       heightMm: 90,
       depthMm: 63,
-      source: { file: "MDT STC-0640.01 产品数据表", url: "https://cdn.mdt-group.com/image/upload/v1753523469/STC-0640-01_MDT_DS_FR.PDF", pages: "2" },
+      source: { file: "MDT STC-0640.01 产品数据表", url: "https://cdn.mdt-group.com/image/upload/v1753521470/STC-0640-01_MDT_DS_GB.PDF", pages: "1–2：L/N/PE、扼流 U1 KNX、非扼流 U2、额定" },
     }),
   }),
   makeSmartProduct({

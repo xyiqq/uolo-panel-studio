@@ -70,7 +70,8 @@ describe('module breaker feeds', () => {
     const design = fixture(), before = structuredClone(design);
     const net = applyModuleFeeds(buildWiring(design), design);
     const feeds = net.wires.filter(w => w.moduleFeed);
-    expect(feeds.filter(w => w.conductor !== 'N')).toHaveLength(2);
+    expect(feeds.filter(w => w.conductor.startsWith('L'))).toHaveLength(2);
+    expect(feeds.find(w=>w.conductor==='PE')?.to).toBe('K2:PE_IN');
     expect(feeds.filter(w => w.moduleId === 'K1' && w.conductor === 'N')).toHaveLength(0);
     expect(feeds.filter(w => w.moduleId === 'K2' && w.conductor === 'N')).toHaveLength(1);
     const binding = net.moduleFeedBindings.find(b => b.moduleId === 'K1');
@@ -82,7 +83,7 @@ describe('module breaker feeds', () => {
     expect(net.wires.some(w => w.to === `X-${binding.breakerId}:${binding.phase}`)).toBe(false);
     expect(design).toEqual(before);
   });
-  it('keeps DIN8SW8 load neutral on its real RCD output and preserves circuit simulation',()=>{
+  it('keeps DIN8SW8 neutral on its own RCD, and an unassigned channel cannot energize the field load',()=>{
     const design=fixture(['crestron-din-8sw8-i']),circuit=design.circuits[0];
     design.customProducts.push({id:'USR-RCD',name:'Test RCD',kind:'rccb',poles:2,width:36,depth:70,modules:2,amps:40,neutralSide:'right'});
     circuit.rcdProductId='USR-RCD';design.modules[0].protectId=circuit.id;
@@ -90,17 +91,20 @@ describe('module breaker feeds', () => {
     expect(neutral.from.startsWith(`${circuit.id}-RCD:`)).toBe(true);
     expect(neutral.to).toBe(`X-${circuit.id}:N`);
     expect(net.internal.some(w=>w.moduleFeed&&w.b===neutral.to)).toBe(false);
-    expect(simulate(net,design,{power:true}).circuits[circuit.id].powered).toBe(true);
+    expect(simulate(net,design,{power:true}).circuits[circuit.id]).toMatchObject({powered:false,neutralOk:true});
+    expect(net.wiringIssues.some(i=>i.code==='MODULE_OUTPUT_UNASSIGNED')).toBe(true);
     neutral.connected=false;
     expect(simulate(net,design,{power:true}).circuits[circuit.id].powered).toBe(false);
   });
-  it('preserves circuit supply simulation and cuts it when the new feed is disconnected', () => {
+  it('energizes the supplied module input only, and cuts input power when its wire is disconnected', () => {
     const design = fixture();
     const net = applyModuleFeeds(buildWiring(design), design);
     const feed = net.wires.find(w => w.moduleFeed && w.conductor !== 'N');
-    expect(simulate(net, design, {power: true}).circuits[feed.breakerId].powered).toBe(true);
+    const energized=simulate(net,design,{power:true});
+    expect(energized.reach[feed.conductor].has(feed.to)).toBe(true);
+    expect(energized.circuits[feed.breakerId].powered).toBe(false);
     feed.connected = false;
-    expect(simulate(net, design, {power: true}).circuits[feed.breakerId].powered).toBe(false);
+    expect(simulate(net,design,{power:true}).reach[feed.conductor].has(feed.to)).toBe(false);
   });
   it('rebuilds persisted feed disconnection and wire section overrides', () => {
     const design = fixture();
@@ -120,8 +124,9 @@ describe('module breaker feeds', () => {
     circuit.rcdProductId = 'USR-RCD';
     design.modules[0].protectId = circuit.id;
     const net = applyModuleFeeds(buildWiring(design), design);
-    expect(net.wires.filter(w => w.moduleFeed)).toHaveLength(2);
-    expect(net.wires.filter(w => w.moduleFeed).every(w => w.from.startsWith(`${circuit.id}-RCD:`))).toBe(true);
+    expect(net.wires.filter(w => w.moduleFeed && w.conductor!=='PE')).toHaveLength(2);
+    expect(net.wires.find(w=>w.to==='K1:PE_IN').from).toBe('PE:PE-'+circuit.id);
+    expect(net.wires.filter(w => w.moduleFeed && w.conductor!=='PE').every(w => w.from.startsWith(`${circuit.id}-RCD:`))).toBe(true);
   });
   it('keeps L2 phase identity and does not automatically feed a single phase module from a 380V branch', () => {
     const design = fixture(['crestron-din-1dimu4']);

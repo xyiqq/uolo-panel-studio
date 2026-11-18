@@ -6,6 +6,19 @@ import {normalizeModule} from '../../src/core/modules.js';
 import {terminalWireSegments} from '../../src/core/terminal-connections.js';
 import {buildBom} from '../../src/core/bom.js';
 
+it('两路 DALI 的四条芯线分别落在端子上方，四条长边清晰分开', () => {
+  const from = { x: 30, y: 48, z: 62, side: 'top' };
+  const to = { x: -28, y: 43, z: 68, side: 'top' };
+  const lanes = [1, 2].flatMap(loop => ['BUS+', 'BUS-'].map(conductor => {
+    const { points } = routeCabinetWire(from, to, conductor, {width: 500}, 0, false, loop);
+    expect(points[0].toArray()).toEqual([from.x, from.y, from.z]);
+    expect(points.at(-1).toArray()).toEqual([to.x, to.y, to.z]);
+    expect(points[3].y).toBeGreaterThan(from.y);
+    return points[3].y;
+  }));
+  expect(new Set(lanes).size).toBe(4);
+});
+
 it.each(['top','bottom','left','right'])('neutral bar %s persists without changing PE or topology',pos=>{
  const d=validateDesign(createBlankDesign({nBarPosition:pos}));
  expect(materializeTemplate(snapshotDesignTemplate(d,'位置模板')).nBarPosition).toBe(pos);

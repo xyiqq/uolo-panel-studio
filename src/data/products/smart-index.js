@@ -1,6 +1,7 @@
 /**
  * 智能/多品牌产品汇总。
  */
+import {SDM630_V2} from './meter-eastron.js';
 import { CRESTRON_PRODUCTS } from "./smart-crestron.js";
 import { LUTRON_PRODUCTS } from "./smart-lutron.js";
 import { KNX_PRODUCTS } from "./smart-knx.js";
@@ -14,6 +15,7 @@ import { USMART_PRODUCTS } from './smart-usmart.js';
 
 /** @type {object[]} */
 export const SMART_PRODUCTS = [
+  SDM630_V2,
   ...USMART_PRODUCTS,
   ...BULL_PDU_PRODUCTS,
   ...NETWORK_SWITCH_PRODUCTS,

@@ -160,10 +160,10 @@ export function moduleFaceScene(product = {}, width = 600, height = 240) {
     text(p.residual ? `${p.rcdType || '—'} / ${p.residual} mA` : p.poles ? `${p.poles} POLE` : '参数待核',w/2,253,11,muted,cw,'middle');
   } else if (kind==='psu') {
     for(let i=0;i<7;i++) { rect(pad,111+i*10,cw,3,'#11191d'); line(pad,115+i*10,w-pad,115+i*10,edge,1); }
-    circle(pad+6,205,4,'#64776d'); text('DC',pad+17,209,11,muted,Math.max(10,cw-18));
+    circle(pad+6,205,4,'#64776d'); text(dali?'DALI':'DC',pad+17,209,11,muted,Math.max(10,cw-18));
     rect(pad,224,cw,31,light?'#d6ddd1':'#182025',edge,3);
     const output=p.psuOutput;
-    const outputLabel=output?.voltage ? `${output.voltage}V DC${output.amps!=null?' / '+output.amps+'A':output.milliamps!=null?' / '+output.milliamps+'mA':''}` : 'OUTPUT';
+    const outputLabel=output?.voltage ? `${output.voltage}V DC${output.amps!=null?' / '+output.amps+'A':output.milliamps!=null?' / '+output.milliamps+'mA':''}` : output?.milliamps!=null ? `${output.milliamps} mA` : 'OUTPUT';
     text(outputLabel,w/2,244,11,muted,cw-6,'middle');
   } else if (kind==='meter' || kind==='timer') {
     rect(pad,111,cw,88,'#101b1a',edge,5); rect(pad+4,115,cw-8,80,'#c4d0b2','none',3);

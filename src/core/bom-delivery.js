@@ -45,6 +45,9 @@ export function buildBomDelivery(bom, {assembly}={}) {
     return {name:accessory?.name||'设备（类型待核）',qty:item.qty,unit:accessory?.unit||'个',location:accessory?.location||'用途与安装位置待确认'};
   });
   const wireGroups=new Map();
+  const busLengthNote=bom?.wires?.some(w=>w.estimatedBusLength)
+    ? '按已录入长度和端点估算的整缆长度汇总，走向、实长及线缆规格待核'
+    : '按方案录入长度汇总；走向、实长及线缆规格待核';
   for(const w of bom?.wires||[]) {
     const external=w.lengthKind==='external';
     const bus=!w.lengthKind;
@@ -52,7 +55,7 @@ export function buildBomDelivery(bom, {assembly}={}) {
       name:bus?'总线电缆':external?'出箱电缆芯线':'箱内连接导线',
       qty:Number.isFinite(w.meters)&&w.meters>=0?w.meters:null,
       unit:'m',
-      location:bus?'按方案录入长度汇总；走向、实长及线缆规格待核':external?'按回路长度逐芯估算，非成品多芯电缆采购米数；实长及规格待核':'按布置端点距离和余量估算；实长、截面及规格待核',
+      location:bus?busLengthNote:external?'按回路长度逐芯估算，非成品多芯电缆采购米数；实长及规格待核':'按布置端点距离和余量估算；实长、截面及规格待核',
     };
     const previous=wireGroups.get(row.name);
     if(previous) previous.qty=previous.qty===null||row.qty===null?null:previous.qty+row.qty;

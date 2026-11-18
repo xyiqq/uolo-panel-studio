@@ -39,8 +39,8 @@ describe('explicit module wiring',()=>{
   });
   it('uses the explicit common feeder without shorting branch supplies together',()=>{
     const d=fixture('shared'),n=buildWiring(d),source=d.circuits[2].id;
-    expect(n.wires.filter(w=>w.to==='K1:L_IN')).toHaveLength(1);
-    expect(n.wires.find(w=>w.to==='K1:L_IN').from).toBe(`${source}:L1_OUT`);
+    expect(n.ports['K1:L_IN']).toBeUndefined();
+    for(const ch of [1,2]) expect(n.wires.find(w=>w.to===`K1:CH${ch}_IN`).from).toBe(`${source}:L1_OUT`);
     for(const c of d.circuits.slice(0,2)) expect(n.wires.find(w=>w.to===`X-${c.id}:N`).from).toBe(`${source}:N_OUT`);
     d.states[source]=false;
     expect(simulate(n,d,{power:true}).circuits[d.circuits[0].id].powered).toBe(false);
@@ -59,7 +59,7 @@ describe('explicit module wiring',()=>{
     const d=fixture('shared');d.modules[0].feedCircuitId=null;
     expect(buildWiring(d).wiringIssues.some(i=>i.code==='MODULE_FEED_CONFLICT')).toBe(true);
     d.modules[0].feedCircuitId=d.circuits[2].id;
-    const w=buildWiring(d).wires.find(w=>w.to==='K1:L_IN');
+    const w=buildWiring(d).wires.find(w=>w.to==='K1:CH1_IN');
     d.disconnected.push(w.id);d.wireOverrides[w.id]=6;
     expect(buildWiring(d).wires.find(v=>v.id===w.id)).toMatchObject({section:6,connected:false});
   });
@@ -175,7 +175,7 @@ describe('explicit module wiring',()=>{
     d.circuits[0].productId='A9D32610';d.circuits[0].wire=1.5;
     d.circuits[2].productId='A9D32620';
     const n=buildWiring(d);
-    const feed=n.wires.find(w=>w.to==='K1:L_IN');
+    const feed=n.wires.find(w=>w.to==='K1:CH1_IN');
     for(const conductor of ['L1','N']) expect(n.wires.find(w=>w.to===`X-${cid}:${conductor}`).protect).toBe(feed.protect);
     expect(feed.protect).toBe(20);
     expect(n.wires.find(w=>w.to===`X-${cid}:N`).from).toBe(`${source}:N_OUT`);

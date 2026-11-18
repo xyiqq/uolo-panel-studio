@@ -23,8 +23,8 @@ export function buildDeliveryNet(design, assembly, net) {
     ports[physicalOutput] ||= {id:physicalOutput,node:physicalOutput.split(':')[0],key:physicalOutput.split(':')[1],conductor:'L1',side:'bottom',...s.source};
     ports[s.id]={id:s.id,node:s.terminalId,key:String(s.pole),displayTag:s.id,conductor:'L1',side:'bottom',...s.target};
     const circuit=mod?.channels?.[channel]||null;
-    const phase=design.circuits?.find(c=>c.id===circuit)?.phase||'L1';
     const replaced=wires.find(w=>w.id===s.replacedWireId)||sourceNet?.wires.find(w=>w.id===s.replacedWireId);
+    const phase=replaced?.conductor || (design.supply==='single' ? 'L1' : design.circuits?.find(c=>c.id===circuit)?.phase||'L1');
     if(replaced) {const index=wires.findIndex(w=>w.id===replaced.id);if(index>=0) wires.splice(index,1);}
     wires.push({id:`terminal:${physicalOutput}>${s.id}`,from:physicalOutput,to:s.id,assignedOutput:s.output,conductor:phase,class:'power',lengthKind:'internal',section:s.section==null||s.section===''?null:Number(s.section),material:'Cu',scope:'模块通道 → 接线端子',connected:replaced?.connected!==false,protect:replaced?.protect,wireNo:s.wireNo||'',circuit,moduleId,terminalId:s.terminalId,terminalConnection:true,loadName:s.loadName||s.fieldName});
   }
